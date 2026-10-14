@@ -439,6 +439,23 @@ img {
   transform: translateY(-1px);
 }
 
+.product-card button.cart-added {
+  animation: cart-added-pop 320ms ease;
+  background: var(--color-primary-strong);
+}
+
+@keyframes cart-added-pop {
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card button.cart-added {
+    animation: none;
+  }
+}
+
 .secondary-action {
   background: transparent;
   color: var(--color-primary-strong);

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useCart } from "../cart/CartContext";
 import type { Product } from "../services/productService";
 import { formatPrice } from "../utils/format";
@@ -9,6 +10,7 @@ type ProductCardProps = {
 
 export function ProductCard({ product }: ProductCardProps) {
   const { addProduct } = useCart();
+  const [isAdded, setIsAdded] = useState(false);
   const stockLabel = product.stock <= 0 ? "Slut i lager" : product.stock <= 3 ? `${product.stock} kvar` : "I lager";
   const stockClass = product.stock <= 0 ? "out" : product.stock <= 3 ? "low" : "";
 
@@ -28,8 +30,17 @@ export function ProductCard({ product }: ProductCardProps) {
           <span className="price">{formatPrice(product.price)}</span>
           <span className={`stock-label ${stockClass}`}>{stockLabel}</span>
         </div>
-        <button type="button" disabled={product.stock <= 0} onClick={() => addProduct(product)}>
-          Lägg i varukorg
+        <button
+          type="button"
+          className={isAdded ? "cart-added" : ""}
+          disabled={product.stock <= 0}
+          onClick={() => {
+            addProduct(product);
+            setIsAdded(true);
+            window.setTimeout(() => setIsAdded(false), 1200);
+          }}
+        >
+          {isAdded ? "Tillagd ✓" : "Lägg i varukorg"}
         </button>
       </div>
     </article>
