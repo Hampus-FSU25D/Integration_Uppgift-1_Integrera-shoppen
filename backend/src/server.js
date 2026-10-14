@@ -8,6 +8,9 @@ import session from "express-session";
 import { pool } from "./db/pool.js";
 import { importSupplierCatalog } from "./integrations/supplierImport.js";
 import { SupplierApiError } from "./integrations/supplierAdapter.js";
+import { AlgoliaError, searchProducts } from "./integrations/algoliaAdapter.js";
+import { syncProductsToSearch } from "./integrations/productSearchSync.js";
+import { parseSearchParams, SearchParameterError } from "./integrations/searchParams.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -138,6 +141,23 @@ app.get("/api/categories", async (_request, response, next) => {
   }
 });
 
+app.get("/api/search", async (request, response, next) => {
+  let params;
+  try {
+    params = parseSearchParams(request.query);
+  } catch (error) {
+    if (error instanceof SearchParameterError) return response.status(400).json({ error: error.message });
+    return next(error);
+  }
+
+  try {
+    return response.json(await searchProducts(params.query, params.page, params.pageSize));
+  } catch (error) {
+    if (error instanceof AlgoliaError) return response.status(502).json({ error: error.message });
+    return next(error);
+  }
+});
+
 app.get("/api/products", async (_request, response, next) => {
   try {
     return response.json(await selectProducts("where p.is_active = true order by p.name"));
@@ -198,7 +218,8 @@ app.post("/api/admin/products", requireAdmin, async (request, response, next) =>
       productValues(input),
     );
     const created = await selectProducts("where p.id = $1", [result.rows[0].id]);
-    return response.status(201).json(created[0]);
+    const searchSync = await syncProductsToSearch(created);
+    return response.status(201).json({ ...created[0], searchIndexUpdated: searchSync.updated, searchIndexError: searchSync.error });
   } catch (error) {
     if (error?.code === "23505") return response.status(409).json({ error: "A product with this SKU already exists." });
     return next(error);
@@ -209,6 +230,8 @@ app.put("/api/admin/products/:id", requireAdmin, async (request, response, next)
   try {
     const input = validateProduct(request.body);
     if (!input) return response.status(400).json({ error: "Product details are invalid." });
+    const existing = await pool.query("select sku from products where id=$1", [request.params.id]);
+    if (!existing.rowCount) return response.status(404).json({ error: "Product not found." });
     const values = productValues(input);
     const result = await pool.query(
       `update products set category_id=$1, name=$2, description=$3, price=$4, discount_percentage=$5,
@@ -217,11 +240,38 @@ app.put("/api/admin/products/:id", requireAdmin, async (request, response, next)
     );
     if (!result.rowCount) return response.status(404).json({ error: "Product not found." });
     const updated = await selectProducts("where p.id = $1", [request.params.id]);
-    return response.json(updated[0]);
+    const removedSkus = existing.rows[0].sku === updated[0].sku ? [] : [existing.rows[0].sku];
+    const searchSync = await syncProductsToSearch(updated, { removedSkus });
+    return response.json({ ...updated[0], searchIndexUpdated: searchSync.updated, searchIndexError: searchSync.error });
   } catch (error) {
     if (error?.code === "23505") return response.status(409).json({ error: "A product with this SKU already exists." });
     return next(error);
   }
+});
+
+app.delete("/api/admin/products/:id", requireAdmin, async (request, response, next) => {
+  const client = await pool.connect();
+  let sku;
+  try {
+    await client.query("begin");
+    const product = await client.query("select sku from products where id=$1 for update", [request.params.id]);
+    if (!product.rowCount) {
+      await client.query("rollback");
+      return response.status(404).json({ error: "Product not found." });
+    }
+    sku = product.rows[0].sku;
+    await client.query("delete from cart_items where product_id=$1", [request.params.id]);
+    await client.query("update order_items set product_id=null where product_id=$1", [request.params.id]);
+    await client.query("delete from products where id=$1", [request.params.id]);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    return next(error);
+  } finally {
+    client.release();
+  }
+  const searchSync = await syncProductsToSearch([{ sku, isActive: false }]);
+  return response.json({ deleted: true, searchIndexUpdated: searchSync.updated, searchIndexError: searchSync.error });
 });
 
 app.get("/api/cart", requireUser, async (request, response, next) => {

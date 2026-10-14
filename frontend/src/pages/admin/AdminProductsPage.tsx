@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "../../components/Link";
 import {
   getAdminProducts,
+  deleteAdminProduct,
   importSupplierCatalog,
   type Product,
   type SupplierImportFormat,
@@ -17,6 +18,8 @@ export function AdminProductsPage() {
   const [importingFormat, setImportingFormat] = useState<SupplierImportFormat | null>(null);
   const [importError, setImportError] = useState("");
   const [importReport, setImportReport] = useState<SupplierImportReport | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [productMessage, setProductMessage] = useState("");
 
   async function runImport(format: SupplierImportFormat) {
     setImportingFormat(format);
@@ -34,6 +37,23 @@ export function AdminProductsPage() {
       setImportError(error instanceof Error ? error.message : "Importen kunde inte genomföras.");
     } finally {
       setImportingFormat(null);
+    }
+  }
+
+  async function removeProduct(product: Product) {
+    if (!window.confirm(`Ta bort ${product.name}? Produkten tas även bort från tidigare varukorgar.`)) return;
+    setDeletingId(product.id);
+    setProductMessage("");
+    try {
+      const result = await deleteAdminProduct(product.id);
+      setProducts((current) => current.filter((item) => item.id !== product.id));
+      setProductMessage(result.searchIndexUpdated
+        ? "Produkten togs bort."
+        : `Produkten togs bort från databasen, men sökindexet kunde inte uppdateras: ${result.searchIndexError ?? "Försök igen senare."}`);
+    } catch (error) {
+      setProductMessage(error instanceof Error ? error.message : "Produkten kunde inte tas bort.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -111,6 +131,11 @@ export function AdminProductsPage() {
             <p>
               Nya: {importReport.created}. Uppdaterade: {importReport.updated}. Överhoppade: {importReport.skipped}.
             </p>
+            {importReport.searchIndexUpdated === false && (
+              <p className="form-error" role="alert">
+                Produkterna sparades, men sökindexet kunde inte uppdateras: {importReport.searchIndexError ?? "Försök igen senare."}
+              </p>
+            )}
             {importReport.skippedProducts.length > 0 && (
               <ul>
                 {importReport.skippedProducts.map((product, index) => (
@@ -123,6 +148,8 @@ export function AdminProductsPage() {
           </div>
         )}
       </section>
+
+      {productMessage && <p role="status">{productMessage}</p>}
 
       {products.length === 0 ? (
         <p>Inga produkter finns ännu.</p>
@@ -166,7 +193,10 @@ export function AdminProductsPage() {
                     </span>
                   </td>
                   <td>
-                    <Link href={`/admin/products/${product.id}/edit`}>Redigera</Link>
+                    <Link href={`/admin/products/${product.id}/edit`}>Redigera</Link>{" "}
+                    <button type="button" className="text-action" disabled={deletingId !== null} onClick={() => void removeProduct(product)}>
+                      {deletingId === product.id ? "Tar bort…" : "Ta bort"}
+                    </button>
                   </td>
                 </tr>
               ))}

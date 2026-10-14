@@ -35,6 +35,10 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
       SUPPLIER_API_BASE_URL: ${SUPPLIER_API_BASE_URL:-}
       SUPPLIER_API_KEY: ${SUPPLIER_API_KEY:-}
+      ALGOLIA_APP_ID: ${ALGOLIA_APP_ID:-}
+      ALGOLIA_ADMIN_API_KEY: ${ALGOLIA_ADMIN_API_KEY:-}
+      ALGOLIA_SEARCH_API_KEY: ${ALGOLIA_SEARCH_API_KEY:-}
+      ALGOLIA_INDEX_NAME: ${ALGOLIA_INDEX_NAME:-products}
     depends_on:
       db:
         condition: service_healthy

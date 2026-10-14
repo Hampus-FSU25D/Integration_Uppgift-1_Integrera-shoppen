@@ -1,165 +1,126 @@
 import { useEffect, useMemo, useState } from "react";
 import { CategoryFilter } from "../../components/CategoryFilter";
 import { ProductCard } from "../../components/ProductCard";
-import { getActiveProducts, getCategories, type Category, type Product } from "../../services/productService";
+import { getCategories, searchActiveProducts, type Category, type Product, type ProductSearchResult } from "../../services/productService";
 
 type LoadState = "loading" | "ready" | "error";
-
 const PRODUCTS_PER_PAGE = 12;
 
 function readProductSearch() {
   return new URLSearchParams(window.location.search).get("search")?.trim() ?? "";
 }
 
-function normalizeSearchText(value: string | null) {
-  return (value ?? "").toLocaleLowerCase("sv-SE");
+function readPage() {
+  const value = new URLSearchParams(window.location.search).get("page");
+  return value === null ? 1 : Number(value);
 }
 
 export function ProductListPage() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [result, setResult] = useState<ProductSearchResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState(readProductSearch);
+  const [page, setPage] = useState(readPage);
   const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [visibleCount, setVisibleCount] = useState(PRODUCTS_PER_PAGE);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     let active = true;
-
-    async function loadProducts() {
-      try {
-        const [categoryRows, productRows] = await Promise.all([getCategories(), getActiveProducts()]);
-
-        if (!active) {
-          return;
-        }
-
-        setCategories(categoryRows);
-        setProducts(productRows);
-        setLoadState("ready");
-      } catch {
-        if (active) {
-          setLoadState("error");
-        }
-      }
-    }
-
-    void loadProducts();
-
-    return () => {
-      active = false;
-    };
+    getCategories().then((rows) => {
+      if (active) setCategories(rows);
+    }).catch(() => {
+      if (active) setCategories([]);
+    });
+    return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLoadState("loading");
+    setErrorMessage("");
+    searchActiveProducts(searchQuery, page, PRODUCTS_PER_PAGE).then((searchResult) => {
+      if (!active) return;
+      setResult(searchResult);
+      setLoadState("ready");
+      if (searchResult.totalPages > 0 && page > searchResult.totalPages) changePage(searchResult.totalPages);
+    }).catch((error: Error) => {
+      if (!active) return;
+      setErrorMessage(error.message || "Sökningen misslyckades. Försök igen senare.");
+      setLoadState("error");
+    });
+    return () => { active = false; };
+  }, [searchQuery, page]);
 
   useEffect(() => {
     function handleNavigation() {
       setSearchQuery(readProductSearch());
+      setPage(readPage());
     }
-
     window.addEventListener("popstate", handleNavigation);
-
-    return () => {
-      window.removeEventListener("popstate", handleNavigation);
-    };
+    return () => window.removeEventListener("popstate", handleNavigation);
   }, []);
 
-  useEffect(() => {
-    setVisibleCount(PRODUCTS_PER_PAGE);
-  }, [searchQuery, selectedCategory]);
-
   const visibleProducts = useMemo(() => {
-    const normalizedQuery = normalizeSearchText(searchQuery);
-
-    return products.filter((product) => {
-      const matchesCategory = !selectedCategory || product.categorySlug === selectedCategory;
-
-      if (!matchesCategory) {
-        return false;
-      }
-
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      const searchableText = [product.name, product.brand, product.categoryName].map(normalizeSearchText).join(" ");
-
-      return searchableText.includes(normalizedQuery);
-    });
-  }, [products, searchQuery, selectedCategory]);
+    return (result?.hits ?? []).filter((product) => !selectedCategory || product.categorySlug === selectedCategory);
+  }, [result, selectedCategory]);
 
   const heading = selectedCategory
     ? categories.find((category) => category.slug === selectedCategory)?.name ?? "Produkter"
     : "Alla produkter";
-  const shownProducts = visibleProducts.slice(0, visibleCount);
-  const hasMoreProducts = visibleCount < visibleProducts.length;
   const emptyMessage = searchQuery ? `Inga produkter matchar "${searchQuery}".` : "Inga produkter hittades.";
+
+  function changePage(nextPage: number) {
+    const url = new URL(window.location.href);
+    if (nextPage === 1) url.searchParams.delete("page");
+    else url.searchParams.set("page", String(nextPage));
+    window.history.pushState({}, "", `${url.pathname}${url.search}`);
+    setPage(nextPage);
+  }
 
   function clearSearch() {
     window.history.pushState({}, "", "/");
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }
-
-  if (loadState === "loading") {
-    return (
-      <section className="placeholder">
-        <h1>Produkter</h1>
-        <p>Laddar produkter.</p>
-      </section>
-    );
-  }
-
-  if (loadState === "error") {
-    return (
-      <section className="placeholder">
-        <h1>Produkter</h1>
-        <p>Produkterna kunde inte hämtas. Försök igen senare.</p>
-      </section>
-    );
+    setSearchQuery("");
+    setPage(1);
   }
 
   return (
     <section className="storefront-layout">
-      <CategoryFilter categories={categories} selectedSlug={selectedCategory} onChange={setSelectedCategory} />
+      <CategoryFilter categories={categories} selectedSlug={selectedCategory} onChange={(slug) => {
+        setSelectedCategory(slug);
+        changePage(1);
+      }} />
 
       <div className="product-list-content">
         <div className="page-heading">
           <div>
             <h1>{heading}</h1>
-            <p>
-              Visar {shownProducts.length} av {visibleProducts.length} produkter
-            </p>
-            {searchQuery ? (
+            {loadState === "ready" && <p>Visar {visibleProducts.length} av {result?.totalHits ?? 0} produkter</p>}
+            {searchQuery && (
               <p className="search-summary">
                 <span>Resultat för "{searchQuery}".</span>
-                <button type="button" onClick={clearSearch}>
-                  Rensa sökning
-                </button>
+                <button type="button" onClick={clearSearch}>Rensa sökning</button>
               </p>
-            ) : null}
+            )}
           </div>
         </div>
 
-        {visibleProducts.length === 0 ? (
-          <p>{emptyMessage}</p>
-        ) : (
+        {loadState === "loading" ? <p role="status">Söker produkter…</p> : null}
+        {loadState === "error" ? <p className="form-error" role="alert">{errorMessage}</p> : null}
+        {loadState === "ready" && visibleProducts.length === 0 ? <p>{emptyMessage}</p> : null}
+        {loadState === "ready" && visibleProducts.length > 0 && (
           <>
             <div className="product-grid">
-              {shownProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+              {visibleProducts.map((product: Product) => <ProductCard key={product.id} product={product} />)}
             </div>
-
-            {hasMoreProducts && (
-              <div className="load-more-row">
-                <button
-                  type="button"
-                  className="secondary-action"
-                  onClick={() => setVisibleCount((currentCount) => currentCount + PRODUCTS_PER_PAGE)}
-                >
-                  Visa fler produkter
-                </button>
-              </div>
-            )}
+            <nav className="search-pagination" aria-label="Produktsidor">
+              <button type="button" className="secondary-action" disabled={page <= 1} onClick={() => changePage(page - 1)}>
+                Föregående
+              </button>
+              <span>Sida {page} av {result?.totalPages ?? 0}</span>
+              <button type="button" className="secondary-action" disabled={page >= (result?.totalPages ?? 0)} onClick={() => changePage(page + 1)}>
+                Nästa
+              </button>
+            </nav>
           </>
         )}
       </div>

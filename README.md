@@ -2,6 +2,8 @@
 
 Webbshop med React/Vite, Express och PostgreSQL. React använder Express-API:t för all appdata. Express sköter inloggning, behörighet och checkout; PostgreSQL lagrar produkter, konton, varukorgar och ordrar.
 
+Publik shop: https://market.hampusandersson.dev
+
 ## Kör lokalt
 
 ```powershell
@@ -42,6 +44,20 @@ Kör de fokuserade backendtesterna från projektroten:
 
 ```powershell
 node --test backend/test/supplierAdapter.test.js backend/test/supplierCsv.test.js backend/test/supplierXml.test.js backend/test/supplierProduct.test.js backend/test/supplierImport.test.js
+```
+
+## Labb 2 – Algolia-sökning
+
+Skapa separata Algolia-nycklar för indexering och sökning. Ange app-ID, admin-nyckel, söknyckel och indexnamn med `ALGOLIA_APP_ID`, `ALGOLIA_ADMIN_API_KEY`, `ALGOLIA_SEARCH_API_KEY` och `ALGOLIA_INDEX_NAME` i lokal `.env` och i deploymentens servermiljö. `.env.example` visar bara variabelnamnen. Admin-nyckeln används bara av Express; webbläsaren anropar `/api/search`.
+
+När Algolia-nycklarna är konfigurerade, importera leverantörens CSV eller XML igen från adminsidan för att skicka butikens produkter till indexet. Importen indexerar produktmodellerna från databasen efter commit, inklusive produkter som redan fanns där. Nya, ändrade och borttagna produkter synkas efter att databasskrivningen lyckats. Om synken misslyckas ligger produkten kvar i databasen och adminsidan visar att indexet behöver uppdateras. `objectID` är produktens SKU/artikelnummer.
+
+Sökningen hanteras av Express och returnerar produkter, totalt antal träffar och sidantal. `page` börjar på 1 och `pageSize` har maxtaket 50. Exempel på lokal API-kontroll efter start: `http://localhost:8080/api/search?query=kakao&page=1&pageSize=12`. Ogiltiga värden, till exempel `page=0` eller `pageSize=1000`, ger HTTP 400.
+
+Backendtesterna för leverantörsimport och sökindex körs med:
+
+```powershell
+node --test
 ```
 
 ## Kontroller

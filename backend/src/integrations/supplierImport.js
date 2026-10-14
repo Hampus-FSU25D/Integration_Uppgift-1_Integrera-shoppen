@@ -3,6 +3,7 @@ import { fetchSupplierCatalog, SupplierApiError } from "./supplierAdapter.js";
 import { parseSupplierCsv } from "./supplierCsv.js";
 import { mapSupplierProduct } from "./supplierProduct.js";
 import { parseSupplierXml } from "./supplierXml.js";
+import { syncProductsToSearch } from "./productSearchSync.js";
 
 const supplierBranch = "mat";
 
@@ -38,7 +39,7 @@ export async function importSupplierCatalog(format) {
   }
 }
 
-export async function saveSupplierProducts(rows, client) {
+export async function saveSupplierProducts(rows, client, options = {}) {
   const report = {
     created: 0,
     updated: 0,
@@ -79,11 +80,45 @@ export async function saveSupplierProducts(rows, client) {
       else report.updated += 1;
     }
     await client.query("commit");
-    return report;
   } catch (error) {
     await client.query("rollback");
     throw error;
   }
+
+  try {
+    const result = await client.query(
+      `select p.id,p.external_id,p.category_id,p.name,p.description,p.price,p.discount_percentage,p.rating,
+       p.stock,p.brand,p.sku,p.image_url,p.is_active,c.name as category_name,c.slug as category_slug
+       from products p left join categories c on c.id=p.category_id`,
+    );
+    const syncResult = await syncProductsToSearch(result.rows.map(mapProductRow), options);
+    report.searchIndexUpdated = syncResult.updated;
+    if (!syncResult.updated) report.searchIndexError = syncResult.error;
+  } catch (error) {
+    report.searchIndexUpdated = false;
+    report.searchIndexError = error instanceof Error ? error.message : "Search index could not be updated.";
+  }
+  return report;
+}
+
+function mapProductRow(row) {
+  return {
+    id: row.id,
+    externalId: row.external_id,
+    categoryId: row.category_id,
+    categoryName: row.category_name,
+    categorySlug: row.category_slug,
+    name: row.name,
+    description: row.description,
+    price: Number(row.price),
+    discountPercentage: Number(row.discount_percentage ?? 0),
+    rating: row.rating === null ? null : Number(row.rating),
+    stock: row.stock,
+    brand: row.brand,
+    sku: row.sku,
+    imageUrl: row.image_url,
+    isActive: row.is_active,
+  };
 }
 
 function slugify(value) {

@@ -44,6 +44,20 @@ export type SupplierImportReport = {
   updated: number;
   skipped: number;
   skippedProducts: Array<{ articleNumber: string | null; reason: string }>;
+  searchIndexUpdated: boolean;
+  searchIndexError?: string;
+};
+
+export type ProductSearchResult = {
+  hits: Product[];
+  totalHits: number;
+  totalPages: number;
+  page: number;
+};
+
+export type AdminProductSaveResult = Product & {
+  searchIndexUpdated: boolean;
+  searchIndexError?: string;
 };
 
 export function getCategories() {
@@ -52,6 +66,11 @@ export function getCategories() {
 
 export function getActiveProducts() {
   return apiRequest<Product[]>("/products");
+}
+
+export function searchActiveProducts(query: string, page: number, pageSize = 12) {
+  const params = new URLSearchParams({ query, page: String(page), pageSize: String(pageSize) });
+  return apiRequest<ProductSearchResult>(`/search?${params}`);
 }
 
 export function getAdminProducts() {
@@ -77,9 +96,15 @@ export function getAdminProductById(id: string) {
 }
 
 export function createAdminProduct(input: ProductFormInput) {
-  return apiRequest<Product>("/admin/products", { method: "POST", body: JSON.stringify(input) });
+  return apiRequest<AdminProductSaveResult>("/admin/products", { method: "POST", body: JSON.stringify(input) });
 }
 
 export function updateAdminProduct(id: string, input: ProductFormInput) {
-  return apiRequest<Product>(`/admin/products/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) });
+  return apiRequest<AdminProductSaveResult>(`/admin/products/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function deleteAdminProduct(id: string) {
+  return apiRequest<{ deleted: boolean; searchIndexUpdated: boolean; searchIndexError?: string }>(
+    `/admin/products/${encodeURIComponent(id)}`, { method: "DELETE" },
+  );
 }

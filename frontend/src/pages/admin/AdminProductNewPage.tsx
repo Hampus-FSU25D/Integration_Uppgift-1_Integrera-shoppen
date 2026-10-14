@@ -62,7 +62,8 @@ export function AdminProductNewPage() {
 
     try {
       const product = await createAdminProduct(input);
-      window.history.pushState({}, "", `/admin/products/${product.id}/edit`);
+      const searchStatus = product.searchIndexUpdated ? "" : "?searchIndex=stale";
+      window.history.pushState({}, "", `/admin/products/${product.id}/edit${searchStatus}`);
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch {
       setMessage("Produkten kunde inte sparas. Kontrollera att SKU är unik.");
@@ -110,7 +111,7 @@ export function AdminProductNewPage() {
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
       />
-      {message && <p className="form-message">{message}</p>}
+      {message && <p className="form-message" role="status">{message}</p>}
     </section>
   );
 }

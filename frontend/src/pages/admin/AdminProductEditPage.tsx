@@ -22,6 +22,12 @@ export function AdminProductEditPage({ path }: PageProps) {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("searchIndex") === "stale") {
+      setMessage("Produkten sparades, men sökindexet kunde inte uppdateras. Kontrollera Algolia-inställningarna och spara produkten igen.");
+    }
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     async function loadProduct() {
@@ -61,7 +67,9 @@ export function AdminProductEditPage({ path }: PageProps) {
     try {
       const updatedProduct = await updateAdminProduct(productId, input);
       setProduct(updatedProduct);
-      setMessage("Produkten sparades.");
+      setMessage(updatedProduct.searchIndexUpdated
+        ? "Produkten sparades."
+        : `Produkten sparades, men sökindexet kunde inte uppdateras: ${updatedProduct.searchIndexError ?? "Försök igen senare."}`);
     } catch {
       setMessage("Produkten kunde inte sparas. Kontrollera att SKU är unik.");
     } finally {
@@ -120,7 +128,7 @@ export function AdminProductEditPage({ path }: PageProps) {
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
       />
-      {message && <p className="form-message">{message}</p>}
+      {message && <p className="form-message" role="status">{message}</p>}
     </section>
   );
 }
