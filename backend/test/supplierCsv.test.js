@@ -9,7 +9,7 @@ test("parses supplier rows without converting product values", () => {
     "LEV-1002;0735105551219;Smörgås;Mat;79,00;;;2026-09-02",
   ].join("\r\n");
 
-  assert.deepEqual(parseSupplierCsv(csv), [
+  assert.deepEqual(parseSupplierCsv(csv).rows, [
     {
       artNr: "LEV-1001",
       ean: "0735105543300",
@@ -39,14 +39,17 @@ test("parses quoted semicolons and escaped quotes in fields", () => {
     'LEV-1001;"Bröd; ""surdegs"""',
   ].join("\n");
 
-  assert.deepEqual(parseSupplierCsv(csv), [
+  assert.deepEqual(parseSupplierCsv(csv).rows, [
     { artNr: "LEV-1001", benamning: 'Bröd; "surdegs"' },
   ]);
 });
 
-test("rejects rows whose number of values differs from the header", () => {
-  assert.throws(
-    () => parseSupplierCsv("artNr;ean\nLEV-1001"),
-    /CSV row 2 has 1 value; expected 2/,
-  );
+test("skips rows whose number of values differs from the header with a reason", () => {
+  assert.deepEqual(parseSupplierCsv("artNr;ean\nLEV-1001;0735\nLEV-1002"), {
+    rows: [{ artNr: "LEV-1001", ean: "0735" }],
+    skipped: [{
+      articleNumber: "LEV-1002",
+      reason: "CSV row 3 has 1 value; expected 2.",
+    }],
+  });
 });

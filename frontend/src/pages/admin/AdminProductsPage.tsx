@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "../../components/Link";
-import { getAdminProducts, type Product } from "../../services/productService";
+import {
+  getAdminProducts,
+  importSupplierCatalog,
+  type Product,
+  type SupplierImportFormat,
+  type SupplierImportReport,
+} from "../../services/productService";
 import { formatPrice } from "../../utils/format";
 
 type LoadState = "loading" | "ready" | "error";
@@ -8,6 +14,28 @@ type LoadState = "loading" | "ready" | "error";
 export function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [importingFormat, setImportingFormat] = useState<SupplierImportFormat | null>(null);
+  const [importError, setImportError] = useState("");
+  const [importReport, setImportReport] = useState<SupplierImportReport | null>(null);
+
+  async function runImport(format: SupplierImportFormat) {
+    setImportingFormat(format);
+    setImportError("");
+    setImportReport(null);
+    try {
+      const report = await importSupplierCatalog(format);
+      setImportReport(report);
+      try {
+        setProducts(await getAdminProducts());
+      } catch {
+        setImportError("Importen genomfördes, men produktlistan kunde inte uppdateras.");
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Importen kunde inte genomföras.");
+    } finally {
+      setImportingFormat(null);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -65,6 +93,36 @@ export function AdminProductsPage() {
           Lägg till produkt
         </Link>
       </div>
+
+      <section className="supplier-import" aria-labelledby="supplier-import-heading">
+        <h2 id="supplier-import-heading">Importera leverantörens produkter</h2>
+        <p>Bransch: mat. Välj vilket filformat som ska importeras.</p>
+        <div className="supplier-import-actions">
+          <button className="button" type="button" disabled={importingFormat !== null} onClick={() => void runImport("csv")}>
+            {importingFormat === "csv" ? "Importerar CSV…" : "Importera CSV"}
+          </button>
+          <button className="button" type="button" disabled={importingFormat !== null} onClick={() => void runImport("xml")}>
+            {importingFormat === "xml" ? "Importerar XML…" : "Importera XML"}
+          </button>
+        </div>
+        {importError && <p className="form-error" role="alert">{importError}</p>}
+        {importReport && (
+          <div className="supplier-import-report" role="status">
+            <p>
+              Nya: {importReport.created}. Uppdaterade: {importReport.updated}. Överhoppade: {importReport.skipped}.
+            </p>
+            {importReport.skippedProducts.length > 0 && (
+              <ul>
+                {importReport.skippedProducts.map((product, index) => (
+                  <li key={`${product.articleNumber ?? "unknown"}-${index}`}>
+                    {product.articleNumber ?? "Okänt artikelnummer"}: {product.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
 
       {products.length === 0 ? (
         <p>Inga produkter finns ännu.</p>

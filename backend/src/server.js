@@ -6,6 +6,8 @@ import cors from "cors";
 import express from "express";
 import session from "express-session";
 import { pool } from "./db/pool.js";
+import { importSupplierCatalog } from "./integrations/supplierImport.js";
+import { SupplierApiError } from "./integrations/supplierAdapter.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -157,6 +159,22 @@ app.get("/api/admin/products", requireAdmin, async (_request, response, next) =>
   try {
     return response.json(await selectProducts("order by p.name"));
   } catch (error) {
+    return next(error);
+  }
+});
+
+app.post("/api/admin/products/import/:format", requireAdmin, async (request, response, next) => {
+  const { format } = request.params;
+  if (format !== "csv" && format !== "xml") {
+    return response.status(400).json({ error: "Import format must be csv or xml." });
+  }
+
+  try {
+    return response.json(await importSupplierCatalog(format));
+  } catch (error) {
+    if (error instanceof SupplierApiError) {
+      return response.status(error.status ?? 502).json({ error: error.message });
+    }
     return next(error);
   }
 });

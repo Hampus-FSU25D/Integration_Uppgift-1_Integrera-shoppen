@@ -37,6 +37,15 @@ export type ProductFormInput = {
   isActive: boolean;
 };
 
+export type SupplierImportFormat = "csv" | "xml";
+
+export type SupplierImportReport = {
+  created: number;
+  updated: number;
+  skipped: number;
+  skippedProducts: Array<{ articleNumber: string | null; reason: string }>;
+};
+
 export function getCategories() {
   return apiRequest<Category[]>("/categories");
 }
@@ -47,6 +56,10 @@ export function getActiveProducts() {
 
 export function getAdminProducts() {
   return apiRequest<Product[]>("/admin/products");
+}
+
+export function importSupplierCatalog(format: SupplierImportFormat) {
+  return apiRequest<SupplierImportReport>(`/admin/products/import/${format}`, { method: "POST" });
 }
 
 export function getActiveProductById(id: string) {

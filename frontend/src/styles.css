@@ -392,6 +392,39 @@ img {
   line-height: 1.5;
 }
 
+.supplier-import {
+  margin-bottom: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: 20px;
+}
+
+.supplier-import h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.supplier-import > p {
+  margin: 8px 0 16px;
+  color: var(--color-muted);
+}
+
+.supplier-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.supplier-import-report ul {
+  margin-bottom: 0;
+}
+
+.supplier-import .form-error {
+  margin: 16px 0 0;
+  color: var(--color-danger);
+}
+
 .placeholder {
   max-width: 760px;
   border: 1px solid var(--color-border);

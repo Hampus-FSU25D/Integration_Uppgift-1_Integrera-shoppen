@@ -12,15 +12,22 @@ export function parseSupplierCsv(csv) {
     throw new Error("Supplier CSV has invalid headers.");
   }
 
-  return records.flatMap((values, index) => {
-    if (values.length === 1 && values[0] === "") return [];
+  const rows = [];
+  const skipped = [];
+  records.forEach((values, index) => {
+    if (values.length === 1 && values[0] === "") return;
     if (values.length !== headers.length) {
       const rowNumber = index + 2;
       const noun = values.length === 1 ? "value" : "values";
-      throw new Error(`CSV row ${rowNumber} has ${values.length} ${noun}; expected ${headers.length}.`);
+      skipped.push({
+        articleNumber: values[0] || null,
+        reason: `CSV row ${rowNumber} has ${values.length} ${noun}; expected ${headers.length}.`,
+      });
+      return;
     }
-    return [Object.fromEntries(headers.map((header, column) => [header, values[column]]))];
+    rows.push(Object.fromEntries(headers.map((header, column) => [header, values[column]])));
   });
+  return { rows, skipped };
 }
 
 function parseRecords(csv) {
