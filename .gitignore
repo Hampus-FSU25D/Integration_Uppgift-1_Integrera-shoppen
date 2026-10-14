@@ -13,5 +13,4 @@ npm-debug.log*
 .tmp-dev-server-frontend.out.log
 .stitch/
 frontend/.stitch/
-docs/superpowers/specs/
-docs/superpowers/plans/
+docs/superpowers
