@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useCart } from "../../cart/CartContext";
 import { Link } from "../../components/Link";
 import type { PageProps } from "../../routes/routes";
 import { getOrderSummary, getRememberedOrderSummary, type CreatedOrder } from "../../services/orderService";
@@ -8,8 +9,16 @@ type LoadState = "loading" | "ready" | "error" | "not-found";
 
 export function OrderConfirmationPage({ path }: PageProps) {
   const orderId = path.split("/").at(-1) ?? "";
+  const { clearCart, isReady: isCartReady } = useCart();
   const [order, setOrder] = useState<CreatedOrder | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const clearedCartForOrder = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (order?.status !== "confirmed" || !isCartReady || clearedCartForOrder.current === orderId) return;
+    clearedCartForOrder.current = orderId;
+    clearCart();
+  }, [clearCart, isCartReady, order?.status, orderId]);
 
   useEffect(() => {
     let active = true;
@@ -105,7 +114,11 @@ export function OrderConfirmationPage({ path }: PageProps) {
       <dl className="product-facts">
         <div>
           <dt>Ordernummer</dt>
-          <dd>{order.id}</dd>
+          <dd>#{order.id.slice(0, 8)}</dd>
+        </div>
+        <div>
+          <dt>Order-ID</dt>
+          <dd><code>{order.id}</code></dd>
         </div>
         <div>
           <dt>Totalbelopp</dt>

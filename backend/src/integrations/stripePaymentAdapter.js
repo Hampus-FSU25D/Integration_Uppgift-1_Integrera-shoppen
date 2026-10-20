@@ -41,11 +41,16 @@ export async function createStripeCheckoutSession(orderId, {
   let session;
   try {
     const client = stripeClient ?? new Stripe(apiKey, { timeout: requestTimeoutMs });
+    const orderNumber = `#${order.id.slice(0, 8)}`;
     session = await client.checkout.sessions.create({
       mode: "payment",
       customer_email: order.customer_email,
       client_reference_id: order.id,
-      metadata: { orderId: order.id },
+      metadata: { orderId: order.id, orderNumber },
+      payment_intent_data: {
+        description: `Order ${orderNumber}`,
+        metadata: { orderId: order.id, orderNumber },
+      },
       success_url: successUrl.replace("{ORDER_ID}", order.id),
       cancel_url: cancelUrl,
       line_items: [{
@@ -53,7 +58,7 @@ export async function createStripeCheckoutSession(orderId, {
         price_data: {
           currency: "sek",
           unit_amount: amount,
-          product_data: { name: `Order ${order.id}` },
+          product_data: { name: `Order ${orderNumber}` },
         },
       }],
     });

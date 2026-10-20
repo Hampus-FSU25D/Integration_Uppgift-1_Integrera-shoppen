@@ -20,6 +20,7 @@ type CartContextValue = {
   itemCount: number;
   totalPrice: number;
   isSyncing: boolean;
+  isReady: boolean;
   addProduct: (product: Product) => void;
   increaseQuantity: (productId: string) => void;
   decreaseQuantity: (productId: string) => void;
@@ -33,6 +34,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { status, user } = useAuth();
   const [items, setItems] = useState<CartItem[]>(() => readStoredCart());
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const hasLoadedDatabaseCart = useRef(false);
 
   useEffect(() => {
@@ -58,9 +60,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (!user) {
         hasLoadedDatabaseCart.current = false;
         setItems(readStoredCart());
+        setIsReady(true);
         return;
       }
 
+      setIsReady(false);
       setIsSyncing(true);
 
       try {
@@ -82,6 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } finally {
         if (active) {
           setIsSyncing(false);
+          setIsReady(true);
         }
       }
     }
@@ -129,6 +134,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       itemCount,
       totalPrice,
       isSyncing,
+      isReady,
       addProduct(product) {
         if (product.stock <= 0) {
           return;
@@ -194,7 +200,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setItems([]);
       },
     };
-  }, [isSyncing, items]);
+  }, [isReady, isSyncing, items]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

@@ -39,7 +39,10 @@ test("creates a SEK Checkout Session using the pending order total from the data
   assert.equal(params.line_items[0].price_data.unit_amount, 12345);
   assert.equal(params.customer_email, "buyer@example.com");
   assert.equal(params.client_reference_id, "550e8400-e29b-41d4-a716-446655440000");
-  assert.equal(params.metadata.orderId, "550e8400-e29b-41d4-a716-446655440000");
+  assert.deepEqual(params.metadata, { orderId: "550e8400-e29b-41d4-a716-446655440000", orderNumber: "#550e8400" });
+  assert.equal(params.payment_intent_data.description, "Order #550e8400");
+  assert.deepEqual(params.payment_intent_data.metadata, params.metadata);
+  assert.equal(params.line_items[0].price_data.product_data.name, "Order #550e8400");
 });
 
 test("rejects malformed order IDs before querying the database", async () => {
@@ -77,13 +80,14 @@ test("maps Stripe failures to a controlled payment error", async () => {
 });
 
 test("requires a Stripe test key and validates the returned session", async () => {
-  const deps = dependencies({ status: "pending", customer_email: "buyer@example.com", total_price: "12.34" });
+  const order = { id: "550e8400-e29b-41d4-a716-446655440000", status: "pending", customer_email: "buyer@example.com", total_price: "12.34" };
+  const deps = dependencies(order);
   await assert.rejects(createStripeCheckoutSession("550e8400-e29b-41d4-a716-446655440000", {
     ...deps, env: { ...validEnvironment, STRIPE_SECRET_KEY: "sk_live_example" },
   }), /test-mode Stripe secret key/);
 
   await assert.rejects(createStripeCheckoutSession("550e8400-e29b-41d4-a716-446655440000", {
-    ...dependencies({ status: "pending", customer_email: "buyer@example.com", total_price: "12.34" }, { id: "cs_live_example", url: "http://unsafe.example", livemode: true }),
+    ...dependencies(order, { id: "cs_live_example", url: "http://unsafe.example", livemode: true }),
     env: validEnvironment,
   }), /invalid Checkout Session/);
 });
