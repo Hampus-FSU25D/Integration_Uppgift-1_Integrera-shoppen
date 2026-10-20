@@ -11,6 +11,7 @@ import { SupplierApiError } from "./integrations/supplierAdapter.js";
 import { AlgoliaError, searchProducts } from "./integrations/algoliaAdapter.js";
 import { syncProductsToSearch } from "./integrations/productSearchSync.js";
 import { parseSearchParams, SearchParameterError } from "./integrations/searchParams.js";
+import { createGuestPaymentCredential, createOrderPaymentRouter } from "./integrations/orderPaymentRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -54,6 +55,7 @@ app.use(
     },
   }),
 );
+app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 
 app.get("/api/health", async (_request, response) => {
   try {
@@ -339,6 +341,7 @@ app.post("/api/orders", async (request, response, next) => {
 
   const quantities = new Map();
   for (const item of input.items) quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+  const guestPaymentCredential = request.session.userId ? null : createGuestPaymentCredential();
   const client = await pool.connect();
   try {
     await client.query("begin");
@@ -362,10 +365,11 @@ app.post("/api/orders", async (request, response, next) => {
 
     const orderResult = await client.query(
       `insert into orders (user_id, customer_name, customer_email, customer_phone, shipping_address,
-       shipping_postal_code, shipping_city, shipping_country, total_price, status)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') returning id,total_price`,
+       shipping_postal_code, shipping_city, shipping_country, total_price, status, guest_payment_token_hash)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10) returning id,total_price`,
       [request.session.userId ?? null, input.customerName, input.customerEmail, input.customerPhone,
-        input.shippingAddress, input.shippingPostalCode, input.shippingCity, input.shippingCountry, total],
+        input.shippingAddress, input.shippingPostalCode, input.shippingCity, input.shippingCountry, total,
+        guestPaymentCredential?.tokenHash ?? null],
     );
     const order = orderResult.rows[0];
     for (const line of orderLines) {
@@ -375,7 +379,11 @@ app.post("/api/orders", async (request, response, next) => {
       );
     }
     await client.query("commit");
-    return response.status(201).json({ id: order.id, totalPrice: Number(order.total_price) });
+    return response.status(201).json({
+      id: order.id,
+      totalPrice: Number(order.total_price),
+      ...(guestPaymentCredential ? { paymentToken: guestPaymentCredential.token } : {}),
+    });
   } catch (error) {
     await client.query("rollback");
     if (error instanceof CheckoutError) return response.status(400).json({ error: error.message });

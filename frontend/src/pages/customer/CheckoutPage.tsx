@@ -1,11 +1,12 @@
 import { FormEvent, useState } from "react";
 import { useCart } from "../../cart/CartContext";
 import { Link } from "../../components/Link";
-import { createOrder, rememberOrderSummary } from "../../services/orderService";
+import { createCheckoutSession, createOrder, rememberOrderSummary } from "../../services/orderService";
+import type { CreatedOrder } from "../../services/orderService";
 import { formatPrice } from "../../utils/format";
 
 export function CheckoutPage() {
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, totalPrice } = useCart();
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -15,6 +16,7 @@ export function CheckoutPage() {
   const [shippingCountry, setShippingCountry] = useState("Sverige");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<CreatedOrder | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,23 +30,34 @@ export function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      const order = await createOrder({
-        customerName,
-        customerEmail,
-        customerPhone,
-        shippingAddress,
-        shippingPostalCode,
-        shippingCity,
-        shippingCountry,
-        items,
-      });
+      let order = pendingOrder;
+      if (!order) {
+        try {
+          order = await createOrder({
+            customerName,
+            customerEmail,
+            customerPhone,
+            shippingAddress,
+            shippingPostalCode,
+            shippingCity,
+            shippingCountry,
+            items,
+          });
+        } catch {
+          setMessage("Ordern kunde inte skapas. Kontrollera uppgifterna, lagersaldot och anslutningen och f\u00f6rs\u00f6k igen.");
+          return;
+        }
 
-      rememberOrderSummary(order);
-      clearCart();
-      window.history.pushState({}, "", `/order-confirmation/${order.id}`);
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    } catch {
-      setMessage("Ordern kunde inte skapas. Kontrollera uppgifterna, lagersaldot och anslutningen och försök igen.");
+        setPendingOrder(order);
+        rememberOrderSummary(order);
+      }
+
+      try {
+        const session = await createCheckoutSession(order);
+        window.location.assign(session.url);
+      } catch {
+        setMessage("Ordern \u00e4r sparad, men betalningen kunde inte startas. F\u00f6rs\u00f6k igen.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -67,14 +80,14 @@ export function CheckoutPage() {
       <div className="page-heading">
         <div>
           <h1>Kassa</h1>
-          <p>Betalningen är simulerad i detta studentprojekt.</p>
+          <p>Betalningen sker via Stripe i testl&auml;ge. Inga riktiga betalningar genomf&ouml;rs.</p>
         </div>
         <Link href="/cart">Tillbaka till varukorgen</Link>
       </div>
 
       <div className="checkout-layout">
         <form className="form-block checkout-form checkout-panel" onSubmit={handleSubmit}>
-          <fieldset>
+          <fieldset disabled={isSubmitting || pendingOrder !== null}>
             <legend>Kundinformation</legend>
             <div className="form-row">
               <label>
@@ -112,7 +125,7 @@ export function CheckoutPage() {
             </label>
           </fieldset>
 
-          <fieldset>
+          <fieldset disabled={isSubmitting || pendingOrder !== null}>
             <legend>Leveransadress</legend>
             <label>
               Adress
@@ -161,13 +174,13 @@ export function CheckoutPage() {
             </div>
           </fieldset>
 
-          <p className="notice">Observera: inga riktiga transaktioner genomförs.</p>
+          <p className="notice">Din order markeras som betald f&ouml;rst n&auml;r betalningen har bekr&auml;ftats.</p>
 
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Skapar order..." : "Slutför köp"}
+            {isSubmitting ? "\u00d6ppnar betalningen..." : pendingOrder ? "F\u00f6rs\u00f6k igen" : "G\u00e5 till betalning"}
           </button>
 
-          {message && <p className="form-message">{message}</p>}
+          {message && <p className="form-message" role="alert">{message}</p>}
         </form>
 
         <aside className="order-summary">

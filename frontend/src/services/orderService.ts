@@ -12,7 +12,8 @@ export type CheckoutInput = {
   items: CartItem[];
 };
 
-export type CreatedOrder = { id: string; totalPrice: number };
+export type CreatedOrder = { id: string; totalPrice: number; paymentToken?: string };
+export type CheckoutSession = { id: string; url: string };
 export type OrderStatus = "pending" | "processing" | "delivered" | "refunded";
 export type AdminOrderListItem = {
   id: string;
@@ -42,7 +43,7 @@ export type AdminOrderDetails = AdminOrderListItem & {
 
 const LOCAL_ORDER_SUMMARIES_KEY = "min-egna-ehandel-order-summaries";
 const LOCAL_ORDER_SUMMARY_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
-type StoredOrderSummary = CreatedOrder & { createdAt: string };
+type StoredOrderSummary = { id: string; totalPrice: number; createdAt: string };
 
 export const orderStatusOptions: Array<{ value: OrderStatus; label: string }> = [
   { value: "pending", label: "Beställd" },
@@ -58,14 +59,26 @@ export function createOrder(input: CheckoutInput) {
   });
 }
 
+export function createCheckoutSession(order: CreatedOrder) {
+  return apiRequest<CheckoutSession>(`/orders/${encodeURIComponent(order.id)}/payment-session`, {
+    method: "POST",
+    body: JSON.stringify(order.paymentToken ? { paymentToken: order.paymentToken } : {}),
+  });
+}
+
 export function getOrderSummary(orderId: string) {
   return apiRequest<CreatedOrder>(`/orders/${encodeURIComponent(orderId)}/summary`);
 }
 
 export function rememberOrderSummary(order: CreatedOrder) {
   const summaries = readStoredOrderSummaries();
-  const nextSummaries = [{ ...order, createdAt: new Date().toISOString() }, ...summaries.filter((summary) => summary.id !== order.id)].slice(0, 10);
-  window.localStorage.setItem(LOCAL_ORDER_SUMMARIES_KEY, JSON.stringify(nextSummaries));
+  const summary = { id: order.id, totalPrice: order.totalPrice, createdAt: new Date().toISOString() };
+  const nextSummaries = [summary, ...summaries.filter((storedSummary) => storedSummary.id !== order.id)].slice(0, 10);
+  try {
+    window.localStorage.setItem(LOCAL_ORDER_SUMMARIES_KEY, JSON.stringify(nextSummaries));
+  } catch {
+    // Starting payment must still work when browser storage is unavailable.
+  }
 }
 
 export function getRememberedOrderSummary(orderId: string): CreatedOrder | null {
