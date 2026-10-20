@@ -105,7 +105,7 @@ export function AdminOrdersPage() {
               {orders.map((order) => (
                 <tr key={order.id}>
                   <td>
-                    <strong>#{shortOrderId(order.id)}</strong>
+                    <strong title={order.id}>#{shortOrderId(order.id)}</strong>
                   </td>
                   <td>{formatDate(order.createdAt)}</td>
                   <td>

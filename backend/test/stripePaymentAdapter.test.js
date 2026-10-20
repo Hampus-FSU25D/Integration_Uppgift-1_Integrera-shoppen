@@ -4,7 +4,7 @@ import { createStripeCheckoutSession, StripePaymentError } from "../src/integrat
 
 const validEnvironment = {
   STRIPE_SECRET_KEY: "sk_test_example",
-  STRIPE_SUCCESS_URL: "https://shop.example/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+  STRIPE_SUCCESS_URL: "https://shop.example/order-confirmation/{ORDER_ID}?session_id={CHECKOUT_SESSION_ID}",
   STRIPE_CANCEL_URL: "https://shop.example/checkout/cancel",
 };
 
@@ -34,6 +34,7 @@ test("creates a SEK Checkout Session using the pending order total from the data
   assert.deepEqual(result, { id: "cs_test_example", url: "https://checkout.stripe.com/session" });
   assert.equal(deps.calls[0].args[1][0], "550e8400-e29b-41d4-a716-446655440000");
   const [params] = deps.calls.find((call) => call.type === "stripe").args;
+  assert.equal(params.success_url, "https://shop.example/order-confirmation/550e8400-e29b-41d4-a716-446655440000?session_id={CHECKOUT_SESSION_ID}");
   assert.equal(params.line_items[0].price_data.currency, "sek");
   assert.equal(params.line_items[0].price_data.unit_amount, 12345);
   assert.equal(params.customer_email, "buyer@example.com");
@@ -87,10 +88,10 @@ test("requires a Stripe test key and validates the returned session", async () =
   }), /invalid Checkout Session/);
 });
 
-test("requires the success URL to include Stripe's session ID placeholder", async () => {
+test("requires success URL placeholders for the Checkout Session and order ID", async () => {
   const deps = dependencies({ status: "pending", customer_email: "buyer@example.com", total_price: "12.34" });
   await assert.rejects(createStripeCheckoutSession("550e8400-e29b-41d4-a716-446655440000", {
-    ...deps, env: { ...validEnvironment, STRIPE_SUCCESS_URL: "https://shop.example/checkout/success" },
+    ...deps, env: { ...validEnvironment, STRIPE_SUCCESS_URL: "https://shop.example/order-confirmation/{ORDER_ID}" },
   }), /URLs must be configured/);
   assert.equal(deps.calls.some((call) => call.type === "stripe"), false);
 });

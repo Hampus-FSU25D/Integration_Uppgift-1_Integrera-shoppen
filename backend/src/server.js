@@ -12,6 +12,7 @@ import { AlgoliaError, searchProducts } from "./integrations/algoliaAdapter.js";
 import { syncProductsToSearch } from "./integrations/productSearchSync.js";
 import { parseSearchParams, SearchParameterError } from "./integrations/searchParams.js";
 import { createGuestPaymentCredential, createOrderPaymentRouter } from "./integrations/orderPaymentRoutes.js";
+import { createStripeWebhookRouter } from "./integrations/stripeWebhookRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -37,6 +38,7 @@ app.use(
     credentials: true,
   }),
 );
+app.use("/api/payments/stripe/webhook", createStripeWebhookRouter({ database: pool }));
 app.use(express.json({ limit: "100kb" }));
 
 const PgSession = connectPgSimple(session);
@@ -395,9 +397,9 @@ app.post("/api/orders", async (request, response, next) => {
 
 app.get("/api/orders/:id/summary", async (request, response, next) => {
   try {
-    const result = await pool.query("select id,total_price from orders where id=$1", [request.params.id]);
+    const result = await pool.query("select id,total_price,status from orders where id=$1", [request.params.id]);
     return result.rowCount
-      ? response.json({ id: result.rows[0].id, totalPrice: Number(result.rows[0].total_price) })
+      ? response.json({ id: result.rows[0].id, totalPrice: Number(result.rows[0].total_price), status: result.rows[0].status })
       : response.status(404).json({ error: "Order not found." });
   } catch (error) {
     return next(error);
@@ -431,7 +433,7 @@ app.get("/api/admin/orders/:id", requireAdmin, async (request, response, next) =
 });
 
 app.patch("/api/admin/orders/:id/status", requireAdmin, async (request, response, next) => {
-  const allowedStatuses = new Set(["pending", "processing", "delivered", "refunded"]);
+  const allowedStatuses = new Set(["pending", "confirmed", "processing", "delivered", "cancelled", "refunded"]);
   if (!allowedStatuses.has(request.body?.status)) return response.status(400).json({ error: "Order status is invalid." });
   try {
     const result = await pool.query("update orders set status=$1,updated_at=now() where id=$2", [request.body.status, request.params.id]);

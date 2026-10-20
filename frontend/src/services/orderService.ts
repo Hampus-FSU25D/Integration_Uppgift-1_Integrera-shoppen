@@ -12,9 +12,9 @@ export type CheckoutInput = {
   items: CartItem[];
 };
 
-export type CreatedOrder = { id: string; totalPrice: number; paymentToken?: string };
+export type CreatedOrder = { id: string; totalPrice: number; paymentToken?: string; status?: OrderStatus };
 export type CheckoutSession = { id: string; url: string };
-export type OrderStatus = "pending" | "processing" | "delivered" | "refunded";
+export type OrderStatus = "pending" | "confirmed" | "processing" | "delivered" | "cancelled" | "refunded";
 export type AdminOrderListItem = {
   id: string;
   customerName: string;
@@ -47,8 +47,10 @@ type StoredOrderSummary = { id: string; totalPrice: number; createdAt: string };
 
 export const orderStatusOptions: Array<{ value: OrderStatus; label: string }> = [
   { value: "pending", label: "Beställd" },
+  { value: "confirmed", label: "Betald" },
   { value: "processing", label: "Behandlas" },
   { value: "delivered", label: "Levererad" },
+  { value: "cancelled", label: "Avbruten" },
   { value: "refunded", label: "Återbetald" },
 ];
 

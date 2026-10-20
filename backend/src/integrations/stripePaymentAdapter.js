@@ -46,7 +46,7 @@ export async function createStripeCheckoutSession(orderId, {
       customer_email: order.customer_email,
       client_reference_id: order.id,
       metadata: { orderId: order.id },
-      success_url: successUrl,
+      success_url: successUrl.replace("{ORDER_ID}", order.id),
       cancel_url: cancelUrl,
       line_items: [{
         quantity: 1,
@@ -78,8 +78,11 @@ function toMinorUnits(value) {
 }
 
 function validateReturnUrl(value, needsSessionPlaceholder = false) {
-  if (typeof value !== "string" || (needsSessionPlaceholder && !value.includes("{CHECKOUT_SESSION_ID}"))) return null;
-  const urlText = needsSessionPlaceholder ? value.replace("{CHECKOUT_SESSION_ID}", "test-session") : value;
+  if (typeof value !== "string" || (needsSessionPlaceholder &&
+      (!value.includes("{CHECKOUT_SESSION_ID}") || !value.includes("{ORDER_ID}")))) return null;
+  const urlText = needsSessionPlaceholder
+    ? value.replace("{CHECKOUT_SESSION_ID}", "test-session").replace("{ORDER_ID}", "test-order")
+    : value;
   try {
     const url = new URL(urlText);
     return ["http:", "https:"].includes(url.protocol) ? value : null;

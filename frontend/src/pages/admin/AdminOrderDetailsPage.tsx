@@ -120,6 +120,7 @@ export function AdminOrderDetailsPage({ path }: PageProps) {
       <div className="page-heading">
         <div>
           <h1>Order #{order.id.slice(0, 8)}</h1>
+          <p>Fullständigt ordernummer: <code>{order.id}</code></p>
           <p>
             {formatDate(order.createdAt)} - {getOrderStatusLabel(order.status)} - {formatPrice(order.totalPrice)}
           </p>

@@ -13,8 +13,9 @@ export function OrderConfirmationPage({ path }: PageProps) {
 
   useEffect(() => {
     let active = true;
+    let pollTimer: number | undefined;
 
-    async function loadOrder() {
+    async function loadOrder(attempt = 0) {
       try {
         const orderSummary = await getOrderSummary(orderId);
 
@@ -37,6 +38,9 @@ export function OrderConfirmationPage({ path }: PageProps) {
 
         setOrder(orderSummary);
         setLoadState("ready");
+        if (orderSummary.status === "pending" && attempt < 10) {
+          pollTimer = window.setTimeout(() => void loadOrder(attempt + 1), 1500);
+        }
       } catch {
         if (active) {
           const rememberedOrderSummary = getRememberedOrderSummary(orderId);
@@ -56,6 +60,7 @@ export function OrderConfirmationPage({ path }: PageProps) {
 
     return () => {
       active = false;
+      if (pollTimer !== undefined) window.clearTimeout(pollTimer);
     };
   }, [orderId]);
 
@@ -94,9 +99,9 @@ export function OrderConfirmationPage({ path }: PageProps) {
 
   return (
     <section className="placeholder auth-panel">
-      <span className="badge">Order mottagen</span>
+      <span className="badge">{order.status === "confirmed" ? "Betald" : order.status === "cancelled" ? "Avbruten" : "Order mottagen"}</span>
       <h1>Tack för din beställning!</h1>
-      <p>Vi har tagit emot din order.</p>
+      <p>{order.status === "confirmed" ? "Betalningen är bekräftad och lagersaldot är uppdaterat." : order.status === "cancelled" ? "Betalningen slutfördes inte och ordern avbröts." : "Vi har tagit emot din order. Betalningen inväntar bekräftelse."}</p>
       <dl className="product-facts">
         <div>
           <dt>Ordernummer</dt>
