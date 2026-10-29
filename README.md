@@ -62,9 +62,9 @@ node --test
 
 ## Labb 3 - Stripe Checkout
 
-Stripe Checkout anvander testlage. Ange `STRIPE_SECRET_KEY` (`sk_test_...`),
+Stripe Checkout använder testläge. Ange `STRIPE_SECRET_KEY` (`sk_test_...`),
 `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL` och `STRIPE_WEBHOOK_SECRET` i `.env`.
-`.env.example` visar URL-formatet och variabelnamnen. For lokal testning kor
+`.env.example` visar URL-formatet och variabelnamnen. För lokal testning kör
 Stripe CLI och vidarebefordra webhook-anrop till Express:
 
 ```powershell
@@ -73,13 +73,13 @@ stripe listen --forward-to localhost:8080/api/payments/stripe/webhook
 
 Kopiera CLI:ns signeringshemlighet `whsec_...` till `STRIPE_WEBHOOK_SECRET` och
 starta om backend. I Stripe Dashboard anger du den deployade endpointen som
-`https://market.hampusandersson.dev/api/payments/stripe/webhook` och valjer
+`https://market.hampusandersson.dev/api/payments/stripe/webhook` och väljer
 `checkout.session.completed`, `checkout.session.async_payment_succeeded` samt
-`checkout.session.expired`. Anvand endpointens testlageshemlighet i serverns
-miljo. Lagg aldrig Stripe-nycklar i Git.
+`checkout.session.expired`. Använd endpointens testlägeshemlighet i serverns
+miljö. Lägg aldrig Stripe-nycklar i Git.
 
-Efter ett testkop ska ordern visas som **Betald** i admin och produktlagret
-minska med bestallt antal. Stripe-metadata innehaller hela orderns UUID.
+Efter ett testköp ska ordern visas som **Betald** i admin och produktlagret
+minska med beställt antal. Stripe-metadata innehåller hela orderns UUID.
 Adminlistan visar ett kort prefix och orderdetaljsidan visar hela numret.
 
 ## Labb 4 - produktbilder
