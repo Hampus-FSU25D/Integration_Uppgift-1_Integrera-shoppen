@@ -16,6 +16,7 @@ import { createStripeWebhookRouter } from "./integrations/stripeWebhookRoutes.js
 import { createAdminProductImageRouter } from "./integrations/adminProductImageRoutes.js";
 import { createPostNordServicePointRouter } from "./integrations/postNordServicePointRoutes.js";
 import { createPostNordDeliveryEstimateRouter } from "./integrations/postNordDeliveryEstimateRoutes.js";
+import { createShippingQuoteRouter } from "./integrations/shippingQuoteRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -64,6 +65,7 @@ app.use("/api/admin/products", createAdminProductImageRouter({ requireAdmin, dat
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 app.use("/api/shipping/delivery-estimate", createPostNordDeliveryEstimateRouter());
+app.use("/api/shipping/quote", createShippingQuoteRouter({ database: pool }));
 
 app.get("/api/health", async (_request, response) => {
   try {

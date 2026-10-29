@@ -95,7 +95,7 @@ backendens start. I produktens adminformulär kan en JPEG- eller PNG-fil laddas
 upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ. Vid byte
 sparas den nya bilden innan den gamla Storage-filen tas bort.
 
-## Labb 5 – PostNord (steg 1–3: adapter, routes och leveranstid)
+## Labb 5 – PostNord (steg 1–4: adapter, routes, leveranstid och fraktpris)
 
 Backendens PostNord-adapter hämtar flera närliggande serviceställen med
 `GET /rest/businesslocation/v5/servicepoints/nearest/byaddress` på sandboxen
@@ -143,6 +143,21 @@ Time Calculation-guiden beskriver servicekoder och postnummer, men den publika
 guidesidan visar inget lyckat svarsexempel för dess svarsschema. Delivery
 Options valdes eftersom dess officiella request- och svarsexempel räcker för
 att validera och visa ett intervall korrekt.
+
+Steg 4 exponerar `POST /api/shipping/quote`. Klienten skickar produkt-ID:n och
+antal; backend hämtar produktpris och lager från PostgreSQL och returnerar
+delsumma samt total för båda fraktsätten. Klientens eventuella priser ignoreras.
+Frakt är 59 kr till ombud och 99 kr hem, med fri frakt vid minst 500 kr i
+varusumma. Det här är förslag i labbtexten, inte tvingande belopp; värdena kan
+ändras med `SHIPPING_SERVICE_POINT_PRICE_SEK`, `SHIPPING_HOME_PRICE_SEK` och
+`SHIPPING_FREE_THRESHOLD_SEK`. Beräkningen använder heltalsören.
+konfigurerbara startvärden, inte som lärarkrav.
+
+Backendtesterna för offertberäkningen körs med:
+
+```powershell
+node --test backend/test/shippingPricing.test.js backend/test/shippingQuoteRoutes.test.js
+```
 
 ## Kontroller
 
