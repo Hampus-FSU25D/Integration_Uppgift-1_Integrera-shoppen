@@ -58,7 +58,7 @@ app.use(
     },
   }),
 );
-app.use("/api/admin/product-images", createAdminProductImageRouter({ requireAdmin }));
+app.use("/api/admin/products", createAdminProductImageRouter({ requireAdmin, database: pool }));
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 
 app.get("/api/health", async (_request, response) => {

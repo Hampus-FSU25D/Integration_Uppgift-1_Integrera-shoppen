@@ -88,7 +88,10 @@ Serverns Supabase Storage-adapter accepterar JPEG- och PNG-innehåll som matchar
 filens format. Maxstorleken är 5 MiB (5 242 880 byte); större filer avvisas
 innan något skickas till Storage. Den inkommande uppladdningsrouten får samma
 gräns. Administratörer kan skicka en fil i multipart-fältet `image` till
-`POST /api/admin/product-images` med headern `X-Requested-With: XMLHttpRequest`.
+`POST /api/admin/products/:id/image` med headern `X-Requested-With: XMLHttpRequest`.
+Vid en lyckad uppladdning sparas Storage-sökvägen i `image_storage_path` och den
+publika HTTPS-adressen i `image_url` för produkten. Databasmigreringen körs vid
+backendens start.
 
 ## Kontroller
 
