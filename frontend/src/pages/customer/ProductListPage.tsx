@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CategoryFilter } from "../../components/CategoryFilter";
 import { ProductCard } from "../../components/ProductCard";
-import { getCategories, searchActiveProducts, type Category, type Product, type ProductSearchResult } from "../../services/productService";
+import { getActiveProducts, getCategories, searchActiveProducts, type Category, type Product, type ProductSearchResult } from "../../services/productService";
 
 type LoadState = "loading" | "ready" | "error";
 const PRODUCTS_PER_PAGE = 12;
@@ -38,7 +38,22 @@ export function ProductListPage() {
     let active = true;
     setLoadState("loading");
     setErrorMessage("");
-    searchActiveProducts(searchQuery, page, PRODUCTS_PER_PAGE).then((searchResult) => {
+    const loadProducts = selectedCategory
+      ? getActiveProducts().then((products) => {
+        const query = searchQuery.toLocaleLowerCase();
+        const matches = products.filter((product) => product.categorySlug === selectedCategory &&
+          (!query || [product.name, product.description, product.brand, product.sku]
+            .some((value) => value?.toLocaleLowerCase().includes(query))));
+        const totalPages = Math.ceil(matches.length / PRODUCTS_PER_PAGE);
+        return {
+          hits: matches.slice((page - 1) * PRODUCTS_PER_PAGE, page * PRODUCTS_PER_PAGE),
+          totalHits: matches.length,
+          totalPages,
+          page,
+        };
+      })
+      : searchActiveProducts(searchQuery, page, PRODUCTS_PER_PAGE);
+    loadProducts.then((searchResult) => {
       if (!active) return;
       setResult(searchResult);
       setLoadState("ready");
@@ -49,7 +64,7 @@ export function ProductListPage() {
       setLoadState("error");
     });
     return () => { active = false; };
-  }, [searchQuery, page]);
+  }, [searchQuery, page, selectedCategory]);
 
   useEffect(() => {
     function handleNavigation() {
@@ -60,9 +75,7 @@ export function ProductListPage() {
     return () => window.removeEventListener("popstate", handleNavigation);
   }, []);
 
-  const visibleProducts = useMemo(() => {
-    return (result?.hits ?? []).filter((product) => !selectedCategory || product.categorySlug === selectedCategory);
-  }, [result, selectedCategory]);
+  const visibleProducts = useMemo(() => result?.hits ?? [], [result]);
 
   const heading = selectedCategory
     ? categories.find((category) => category.slug === selectedCategory)?.name ?? "Produkter"
