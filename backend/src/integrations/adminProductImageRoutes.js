@@ -18,6 +18,7 @@ export function createAdminProductImageRouter({
   database,
   uploadImage = uploadProductImage,
   deleteImage = deleteProductImage,
+  syncProduct,
 }) {
   const router = express.Router();
 
@@ -69,15 +70,21 @@ export function createAdminProductImageRouter({
         return response.status(404).json({ error: "Produkten hittades inte." });
       }
 
+      const searchSync = await syncProduct(request.params.productId);
+      const searchSyncResult = {
+        searchIndexUpdated: searchSync.updated,
+        searchIndexError: searchSync.error,
+      };
+
       const oldImagePath = product.rows?.[0]?.image_storage_path;
       if (oldImagePath && oldImagePath !== image.path) {
         try {
           await deleteImage(oldImagePath);
         } catch {
-          return response.status(201).json({ productId: request.params.productId, ...image, cleanupWarning: true });
+          return response.status(201).json({ productId: request.params.productId, ...image, ...searchSyncResult, cleanupWarning: true });
         }
       }
-      return response.status(201).json({ productId: request.params.productId, ...image });
+      return response.status(201).json({ productId: request.params.productId, ...image, ...searchSyncResult });
     } catch (error) {
       if (error instanceof ProductImageValidationError) {
         return response.status(error.status).json({ error: error.message });

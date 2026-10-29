@@ -13,11 +13,13 @@ import {
 const pngBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const productId = "991e8400-e29b-41d4-a716-446655440001";
 
-test("admin can upload one image and receives only its public metadata", async () => {
+test("admin can upload an image and synchronizes the saved product to search", async () => {
   let uploadedImage;
   const queries = [];
+  const syncedProducts = [];
   const result = await uploadRequest({
     database: { async query(sql, values) { queries.push({ sql, values }); return { rowCount: 1 }; } },
+    async syncProduct(id) { syncedProducts.push(id); return { updated: true }; },
     uploadImage: async (image) => {
       uploadedImage = image;
       return { path: "products/uuid.png", publicUrl: "https://images.example.com/image.png" };
@@ -29,13 +31,31 @@ test("admin can upload one image and receives only its public metadata", async (
     productId,
     path: "products/uuid.png",
     publicUrl: "https://images.example.com/image.png",
+    searchIndexUpdated: true,
   });
+  assert.deepEqual(syncedProducts, [productId]);
   assert.deepEqual(uploadedImage, { data: Buffer.from(pngBytes), contentType: "image/png" });
   assert.deepEqual(queries.map(({ sql }) => sql), [
     "select id,image_storage_path from products where id=$1",
     "update products set image_storage_path=$1, image_url=$2, updated_at=now() where id=$3 returning id",
   ]);
   assert.deepEqual(queries[1].values, ["products/uuid.png", "https://images.example.com/image.png", productId]);
+});
+
+test("reports a search-index failure after saving the uploaded image", async () => {
+  const result = await uploadRequest({
+    async syncProduct() { return { updated: false, error: "Algolia is unavailable." }; },
+    uploadImage: async () => ({ path: "products/uuid.png", publicUrl: "https://images.example.com/image.png" }),
+  });
+
+  assert.equal(result.response.status, 201);
+  assert.deepEqual(await result.response.json(), {
+    productId,
+    path: "products/uuid.png",
+    publicUrl: "https://images.example.com/image.png",
+    searchIndexUpdated: false,
+    searchIndexError: "Algolia is unavailable.",
+  });
 });
 
 test("requires an admin session and a custom request header before parsing the upload", async () => {
@@ -116,6 +136,7 @@ async function uploadRequest({
   bytes = pngBytes,
   database = { async query() { return { rowCount: 1 }; } },
   uploadImage,
+  syncProduct = async () => ({ updated: true }),
 }) {
   const app = express();
   app.use("/api/admin/products", createAdminProductImageRouter({
@@ -126,6 +147,7 @@ async function uploadRequest({
     },
     database,
     uploadImage,
+    syncProduct,
   }));
 
   const server = app.listen(0, "127.0.0.1");

@@ -61,7 +61,11 @@ app.use(
     },
   }),
 );
-app.use("/api/admin/products", createAdminProductImageRouter({ requireAdmin, database: pool }));
+app.use("/api/admin/products", createAdminProductImageRouter({
+  requireAdmin,
+  database: pool,
+  syncProduct: async (id) => syncProductsToSearch(await selectProducts("where p.id = $1", [id])),
+}));
 app.use("/api/orders", createOrderCheckoutRouter({ database: pool }));
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 app.use("/api/shipping/service-points", createPostNordServicePointRouter());

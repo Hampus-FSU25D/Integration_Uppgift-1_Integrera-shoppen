@@ -66,6 +66,8 @@ export type ProductImageUploadResult = {
   productId: string;
   path: string;
   publicUrl: string;
+  searchIndexUpdated: boolean;
+  searchIndexError?: string;
   cleanupWarning?: boolean;
 };
 
