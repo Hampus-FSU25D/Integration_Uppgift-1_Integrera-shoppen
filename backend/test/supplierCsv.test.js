@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseSupplierCsv } from "../src/integrations/supplierCsv.js";
 
-test("parses supplier rows without converting product values", () => {
+test("keeps EAN values as text and parses CSV variants as a list", () => {
   const csv = [
     "artNr;ean;benamning;kategori;pris;lagersaldo;varianter;uppdaterad",
     "LEV-1001;0735105543300;Surdegsbröd Klassisk;Bröd;59,00;0;Helt|Skivat;2026-09-01",
@@ -17,7 +17,7 @@ test("parses supplier rows without converting product values", () => {
       kategori: "Bröd",
       pris: "59,00",
       lagersaldo: "0",
-      varianter: "Helt|Skivat",
+      varianter: ["Helt", "Skivat"],
       uppdaterad: "2026-09-01",
     },
     {
@@ -27,7 +27,7 @@ test("parses supplier rows without converting product values", () => {
       kategori: "Mat",
       pris: "79,00",
       lagersaldo: "",
-      varianter: "",
+      varianter: [],
       uppdaterad: "2026-09-02",
     },
   ]);

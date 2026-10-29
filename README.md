@@ -1,187 +1,90 @@
 # Min egen e-handel
 
-Webbshop med React/Vite, Express och PostgreSQL. React använder Express-API:t för all appdata. Express sköter inloggning, behörighet och checkout; PostgreSQL lagrar produkter, konton, varukorgar och ordrar.
+En svensk webbshop med produktkatalog, sökning, kundkonton, varukorg, checkout och en administratörsdel för produkter och ordrar. Projektet är inlämningsuppgift 1, **Integrera shoppen med omvärlden**.
 
-Publik shop: https://market.hampusandersson.dev
+**Publik shop:** https://market.hampusandersson.dev<br>
+**GitHub:** https://github.com/Hampus-FSU25D/Integration_Uppgift-1_Integrera-shoppen
 
-## Kör lokalt
+Frontend är React 19, TypeScript och Vite. Webbläsaren anropar shopens Express-API; Express hanterar inloggning, behörighet, validering och integrationer. PostgreSQL lagrar bland annat konton, produkter, varukorgar och ordrar. `compose.yaml` startar databasen, API:t och frontend. Backend kör databasmigreringar när den startar.
 
-```powershell
-Copy-Item .env.example .env
-```
+## Kom igång lokalt
 
-Byt `POSTGRES_PASSWORD` och `SESSION_SECRET` i `.env`, starta sedan stacken:
+Du behöver Node.js 20 eller senare, npm och Docker med Docker Compose. Integrationsnycklar krävs för att använda respektive extern tjänst.
 
-```powershell
-docker compose -f compose.yaml -f compose.dev.yaml up --build
-```
+1. Klona repot och installera paketen från projektroten:
 
-Öppna shoppen på `http://localhost:8080`. API-anrop går via samma adress under `/api`. Databasen sparas i volymen `postgres_data`.
+   ```powershell
+   npm install
+   ```
 
-## Exempelprodukter
+2. Skapa en lokal miljöfil och fyll i minst databaslösenord och sessionshemlighet:
 
-```powershell
-npm run seed-db
-```
+   ```powershell
+   Copy-Item .env.example .env
+   ```
 
-## Administratör
+   Ändra `POSTGRES_PASSWORD` och `SESSION_SECRET` till egna slumpmässiga värden. Fyll även i nycklar för de integrationer du vill prova. `.env` är ignorerad av Git; lägg aldrig riktiga nycklar i `.env.example` eller i källkoden.
 
-Registrera ett konto i shoppen och ge det administratörsrollen i databasen:
+3. Starta den lokala stacken:
 
-```powershell
-docker compose exec db psql -U shop -d shop -c "UPDATE users SET role = 'admin' WHERE email = 'din-adress@example.com';"
-```
+   ```powershell
+   docker compose -f compose.yaml -f compose.dev.yaml up --build
+   ```
 
-## Labb 1 – import av produktdata
+   Öppna http://localhost:8080. API:t nås via samma adress under `/api`. Compose skapar PostgreSQL-volymen `postgres_data`; backend kör migrationerna vid uppstart. Stoppa med `Ctrl+C` och `docker compose -f compose.yaml -f compose.dev.yaml down`.
 
-Ange `SUPPLIER_API_BASE_URL` och `SUPPLIER_API_KEY` i den lokala `.env`-filen. Variabelnamnen finns i `.env.example`; använd aldrig riktiga nycklar där. Importen använder leverantörens bransch `mat`, som valdes eftersom shoppen främst innehåller dagligvaror.
+För separat frontendutveckling och backend kör du `npm run dev:backend` respektive `npm run dev:frontend` i två terminaler. De lokala utvecklingsportarna är normalt 3000 för API och 5173 för Vite. Miljövariablerna läses från projektets `.env`. Kör `npm run db:migrate` före första starten; den separata backendens utvecklingskommando kör inte migreringarna automatiskt.
 
-Logga in som administratör och öppna **Produkter**. Där finns en knapp för CSV och en för XML. Resultatet visar antal nya, uppdaterade och överhoppade produkter samt artikelnummer och orsak för överhoppade rader.
+För att lägga in exempelprodukter när databasen är igång kan du köra `npm run seed-db`. Skriptet hämtar exempeldata från DummyJSON. Konton registreras via shoppen. Publik registrering ger alltid rollen `customer`; den skapar inte ett administratörskonto. Se avsnittet **Administratörsåtkomst** innan läraren ska prova adminfunktionerna.
 
-Artikelnumret sparas i produktmodellens unika `sku`-fält så att nästa import uppdaterar samma produkt. Produktmodellen saknar EAN- och variantfält, så de värdena importeras inte. Leverantörens tomma lagersaldo blir noll; decimalpriser med kommatecken blir numeriska priser. Trasiga produkter hoppas över, till exempel `LEV-1037` med ogiltigt pris.
+## Integrationer
 
-Kör de fokuserade backendtesterna från projektroten:
+### Labb 1 – import av produktdata
 
-```powershell
-node --test backend/test/supplierAdapter.test.js backend/test/supplierCsv.test.js backend/test/supplierXml.test.js backend/test/supplierProduct.test.js backend/test/supplierImport.test.js
-```
+Backend hämtar CSV eller XML från leverantörens export-API med `SUPPLIER_API_BASE_URL` och `SUPPLIER_API_KEY`. Branschen är `mat`. CSV parsas från text med semikolon som avgränsare; XML valideras före parsning. Svarskodning avläses från HTTP-svaret. Artikelnummer lagras som produktens unika SKU, decimalpriser med kommatecken blir numeriska priser och tomt lagersaldo blir noll. EAN bevaras som text och varianter parsas till listor i både CSV- och XML-importen. Ogiltiga poster hoppas över med orsak. Importen gör upsert på SKU och administrationssidan har separata CSV- och XML-knappar med antal nya, ändrade och överhoppade poster. EAN och varianter sparas inte eftersom produktmodellen saknar fält för dem.
 
-## Labb 2 – Algolia-sökning
+### Labb 2 – Algolia-sökning
 
-Skapa separata Algolia-nycklar för indexering och sökning. Ange app-ID, admin-nyckel, söknyckel och indexnamn med `ALGOLIA_APP_ID`, `ALGOLIA_ADMIN_API_KEY`, `ALGOLIA_SEARCH_API_KEY` och `ALGOLIA_INDEX_NAME` i lokal `.env` och i deploymentens servermiljö. `.env.example` visar bara variabelnamnen. Admin-nyckeln används bara av Express; webbläsaren anropar `/api/search`.
+React skickar fritext, sida, sidstorlek och valfria parametrar för kategori och sortering till `/api/search`; Express validerar dem och anropar Algolia. Kategorin filtreras tillsammans med fritexten. Sorteringen kan vara relevans, lägsta pris eller högsta pris. Svaret kontrolleras och innehåller träffar, totalt antal träffar och sidantal efter filter och sortering. `page` börjar på 1 och `pageSize` är högst 50. Algolias skrivnyckel används av backend för att synka produkter efter import och produktändringar; söknyckeln används för sökningar. Om synkningen misslyckas sparas produkten ändå och admin får en varning. Om sökningen misslyckas visas ett fel i shoppen.
 
-När Algolia-nycklarna är konfigurerade, importera leverantörens CSV eller XML igen från adminsidan för att skicka butikens produkter till indexet. Importen indexerar produktmodellerna från databasen efter commit, inklusive produkter som redan fanns där. Nya, ändrade och borttagna produkter synkas efter att databasskrivningen lyckats. Om synken misslyckas ligger produkten kvar i databasen och adminsidan visar att indexet behöver uppdateras. `objectID` är produktens SKU/artikelnummer.
+Algolia-indexet behöver konfigureras innan kategori och prissortering kan användas: lägg till `filterOnly(categorySlug)` i indexets `attributesForFaceting` och skapa standardreplikerna `<ALGOLIA_INDEX_NAME>_price_asc` och `<ALGOLIA_INDEX_NAME>_price_desc`, sorterade numeriskt på `price`. Behåll befintliga indexinställningar. Se Algolias dokumentation om [filterbara attribut](https://www.algolia.com/doc/api-reference/api-parameters/attributesForFaceting) och [sortering med repliker](https://www.algolia.com/doc/guides/managing-results/refine-results/sorting/in-depth/exhaustive-sort).
 
-Sökningen hanteras av Express och returnerar produkter, totalt antal träffar och sidantal. `page` börjar på 1 och `pageSize` har maxtaket 50. Exempel på lokal API-kontroll efter start: `http://localhost:8080/api/search?query=kakao&page=1&pageSize=12`. Ogiltiga värden, till exempel `page=0` eller `pageSize=1000`, ger HTTP 400.
+### Labb 3 – Stripe Checkout
 
-Backendtesterna för leverantörsimport och sökindex körs med:
-
-```powershell
-node --test
-```
-
-## Labb 3 - Stripe Checkout
-
-Stripe Checkout använder testläge. Ange `STRIPE_SECRET_KEY` (`sk_test_...`),
-`STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL` och `STRIPE_WEBHOOK_SECRET` i `.env`.
-`.env.example` visar URL-formatet och variabelnamnen. För lokal testning kör
-Stripe CLI och vidarebefordra webhook-anrop till Express:
+Express räknar priser och kontrollerar lagersaldo från PostgreSQL, skapar en obetald order och ber Stripe skapa en Checkout-session. Kunden går vidare till Stripes betalningssida. Stripe skickar sedan webhookhändelser till `/api/payments/stripe/webhook`. Backend verifierar signaturen och orderns belopp innan den markerar ordern betald och minskar lagret i en transaktion. Upprepad webhook behandlas idempotent. En utgången session avbryter en fortfarande obetald order. Använd testnycklar. Lokalt kan Stripe CLI vidarebefordra webhooken:
 
 ```powershell
 stripe listen --forward-to localhost:8080/api/payments/stripe/webhook
 ```
 
-Kopiera CLI:ns signeringshemlighet `whsec_...` till `STRIPE_WEBHOOK_SECRET` och
-starta om backend. I Stripe Dashboard anger du den deployade endpointen som
-`https://market.hampusandersson.dev/api/payments/stripe/webhook` och väljer
-`checkout.session.completed`, `checkout.session.async_payment_succeeded` samt
-`checkout.session.expired`. Använd endpointens testlägeshemlighet i serverns
-miljö. Lägg aldrig Stripe-nycklar i Git.
+Ange CLI:ns `whsec_...` som `STRIPE_WEBHOOK_SECRET`. I Stripe Dashboard behöver testendpointen vara `https://market.hampusandersson.dev/api/payments/stripe/webhook` med händelserna `checkout.session.completed`, `checkout.session.async_payment_succeeded` och `checkout.session.expired`. Nycklar och webhookhemlighet ska ligga i backendens miljö.
 
-Efter ett testköp ska ordern visas som **Betald** i admin och produktlagret
-minska med beställt antal. Stripe-metadata innehåller hela orderns UUID.
-Adminlistan visar ett kort prefix och orderdetaljsidan visar hela numret.
+### Labb 4 – produktbilder i Supabase Storage
 
-## Labb 4 - produktbilder
+En administratör laddar upp en JPEG- eller PNG-bild genom Express. Servern kontrollerar filtyp och innehåll, begränsar filen till 5 MiB och laddar upp den till en unik sökväg i Supabase Storage med en hemlig servernyckel. Produktens Storage-sökväg och publika bildadress sparas i PostgreSQL. Vid bildbyte sparas den nya bilden och databasreferensen innan den gamla filen tas bort. Fel från Storage ger ett kontrollerat fel; en misslyckad uppladdning lämnar den gamla produktbilden kvar.
 
-Serverns Supabase Storage-adapter accepterar JPEG- och PNG-innehåll som matchar
-filens format. Maxstorleken är 5 MiB (5 242 880 byte); större filer avvisas
-innan något skickas till Storage. Den inkommande uppladdningsrouten får samma
-gräns. Administratörer kan skicka en fil i multipart-fältet `image` till
-`POST /api/admin/products/:id/image` med headern `X-Requested-With: XMLHttpRequest`.
-Vid en lyckad uppladdning sparas Storage-sökvägen i `image_storage_path` och den
-publika HTTPS-adressen i `image_url` för produkten. Databasmigreringen körs vid
-backendens start. I produktens adminformulär kan en JPEG- eller PNG-fil laddas
-upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ. Vid byte
-sparas den nya bilden innan den gamla Storage-filen tas bort.
+### Labb 5 – PostNord-frakt
 
-## Labb 5 – PostNord (steg 1–4: adapter, routes, leveranstid och fraktpris)
+Express-adaptern anropar PostNords sandbox för närliggande ombud och leveransintervall. Checkout visar ombuds- eller hemleverans, ombudsval, uppskattad leveranstid och fraktpris. Kunden väljer ombud från PostNords svar. När ordern skapas hämtar backend ombuden igen för att kontrollera det valda ID:t och landet. Pris och orderrader räknas från PostgreSQL; servern sparar fraktsätt, pris och ombudsuppgifter och skickar samma totalsumma till Stripe. Standardpriserna är 59 kr till ombud och 99 kr hem, med fri frakt från 500 kr. `SHIPPING_SERVICE_POINT_PRICE_SEK`, `SHIPPING_HOME_PRICE_SEK` och `SHIPPING_FREE_THRESHOLD_SEK` kan ändras i `.env`; Compose skickar värdena vidare till backend och använder standardpriserna om de saknas. Nycklar och PostNords ursprungsadress behövs i backendmiljön. API-fel och ogiltiga svar ger kontrollerade felmeddelanden.
 
-Backendens PostNord-adapter hämtar flera närliggande serviceställen med
-`GET /rest/businesslocation/v5/servicepoints/nearest/byaddress` på sandboxen
-`https://atapi2.postnord.com`. Den tar ett svenskt postnummer och returnerar
-bara ID, landskod, namn och besöksadress. Nyckeln skickas server-till-server i
-PostNords `apikey`-parameter och lagras i `POSTNORD_API_KEY`; sandboxvärdena
-konfigureras via `.env` eller serverns miljövariabler. Se `.env.example`.
+## Administratörsåtkomst
 
-Dokumentationskälla: [PostNord Customer API Guides – Service Points v5](https://guide.developer.postnord.com/).
-Guiden anger sandboxvärd, API-nyckelautentisering och `nearest/byaddress` för
-flera sorterade närliggande serviceställen. Den skiljer detta från
-`bypostalcode`, som returnerar ett standardombud. Guidens exempel på ett
-serviceställesvar visar fälten `servicePointId` och `visitingAddress`; adaptern
-validerar dessa och mappar endast de uppgifter shoppen behöver. PostNord anger
-också att ID måste kombineras med landskod. API-svarsmappningen är verifierad
-mot guideexemplet och mocktester; ett liveanrop mot sandboxen återstår.
-
-Steg 2 exponerar sökningen genom `GET
-/api/shipping/service-points?postalCode=12345`. Routens Express-handler avvisar
-saknat eller dubblerat postnummer, anropar adaptern och returnerar dess
-begränsade serviceställeformat. Providerfel blir kontrollerade HTTP-fel.
-Express-testerna använder en mockad adapter och kräver varken en startad server
-eller PostNord-nyckel:
+Det finns inga publika testinloggningsuppgifter dokumenterade i repot. Registrera ett separat testkonto via shoppen. I lokal utveckling kan databasoperatören ge kontot adminroll så här (byt e-postadressen mot kontots registrerade adress):
 
 ```powershell
-node --test backend/test/postNordServicePointRoutes.test.js
+docker compose exec db psql -U shop -d shop -c "UPDATE users SET role = 'admin' WHERE email = 'teacher-test@example.com';"
 ```
 
-Ett manuellt anrop till `http://localhost:3000/api/shipping/service-points?postalCode=12345`
-kräver att backend körs och att PostNord-sandboxen är konfigurerad i `.env`.
+För den deployade shoppen behöver deploymentens databasoperatör göra motsvarande ändring. Kontrollera sedan rollen och verifiera inloggning samt att `/admin/products` går att öppna. Lämna lärarens dedikerade testkonto och lösenord privat i inlämningskommentaren, inte i repot. Dela inte ägarens personliga konto. Hashade lösenord kan inte återskapas till klartext.
 
-Steg 3 hämtar leveransintervall från PostNords Delivery Options API via
-`GET /api/shipping/delivery-estimate?postalCode=41104&deliveryType=home`.
-PostNord rekommenderar Delivery Options för checkout och dess dokumenterade
-svar innehåller `deliveryTime.dayRange.days`; shoppen visar därför intervallet
-som PostNord returnerar, utan att räkna fram ett eget datum. `deliveryType` är
-`home` eller `service-point`. Anropet anger butikens postnummer och aktuell
-handover-tid. För att anropa tjänsten behövs även `POSTNORD_CUSTOMER_KEY` och
-`POSTNORD_ORIGIN_POSTAL_CODE` i backendmiljön.
+## Reflektion
 
-Dokumentationskälla: [PostNord Customer API Guides – Delivery Options](https://guide.developer.postnord.com/).
-Den innehåller requestformatet för `POST /rest/shipment/v1/deliveryoptions/bywarehouse`,
-leveransalternativen och `deliveryTime.dayRange.days`. Den separata Transit
-Time Calculation-guiden beskriver servicekoder och postnummer, men den publika
-guidesidan visar inget lyckat svarsexempel för dess svarsschema. Delivery
-Options valdes eftersom dess officiella request- och svarsexempel räcker för
-att validera och visa ett intervall korrekt.
+I projektet används flera integrationssätt eftersom tjänsterna gör olika saker. Produktimporten är en filbaserad integration: leverantören lämnar CSV eller XML och backend hämtar filinnehållet. Algolia används med API-anrop för att söka och hålla produktindexet uppdaterat. För betalningen används både en omdirigering och en webhook. Kunden går till Stripes Checkout, medan webhooken talar om för vår server att betalningen faktiskt blev klar. Produktbilder skickas som filuppladdningar från admin till Express, som i sin tur skickar dem till Supabase Storage. PostNord anropas med API för ombud och leveranstid. Valet passar eftersom butiken behöver aktuella tjänstesvar, medan betalningsstatus måste komma tillbaka server-till-server.
 
-Steg 4 exponerar `POST /api/shipping/quote`. Klienten skickar produkt-ID:n och
-antal; backend hämtar produktpris och lager från PostgreSQL och returnerar
-delsumma samt total för båda fraktsätten. Klientens eventuella priser ignoreras.
-Frakt är 59 kr till ombud och 99 kr hem, med fri frakt vid minst 500 kr i
-varusumma. Det här är förslag i labbtexten, inte tvingande belopp; värdena kan
-ändras med `SHIPPING_SERVICE_POINT_PRICE_SEK`, `SHIPPING_HOME_PRICE_SEK` och
-`SHIPPING_FREE_THRESHOLD_SEK`. Beräkningen använder heltalsören.
+React går via Express för att webbläsaren inte ska få leverantörernas hemliga nycklar. Det gör också att servern kan kontrollera information innan den används. Vid checkout utgår priset från PostgreSQL, inte från det belopp webbläsaren skickar. På samma sätt kontrollerar backend att ett valt PostNord-ombud fortfarande finns och att Stripe-webhookens signatur stämmer. React får shopens egna svar och behöver inte känna till varje leverantörs API-format.
 
-Backendtesterna för offertberäkningen körs med:
+Att använda tjänsterna sparar arbete som annars skulle bli stora egna delsystem. För att bygga betalning själv skulle jag behöva hantera kortuppgifter säkert, bankkopplingar och kvitton. En egen sökmotor behöver indexering och felskrivningstolerans. Bildlagring kräver lagring, åtkomst och leverans av bilder. Egen fraktinformation kräver avtal och uppdaterade ombudsdata. Leverantörsimporten slipper att någon manuellt registrerar hela sortimentet. I min kod mappas leverantörens produkter till butikens SKU, namn, pris och lager.
 
-```powershell
-node --test backend/test/shippingPricing.test.js backend/test/shippingQuoteRoutes.test.js
-```
+Om leverantörens API inte svarar får importen ett kontrollerat fel; befintliga produkter finns kvar. Om Algolia inte går att nå kan en synkning misslyckas trots att produkten sparats, och administratören får en varning. Sökningen visar fel i butiken i stället för att låtsas att inga produkter finns. Om Stripe inte kan skapa en betalning får kunden inte en fungerande Checkout-session. En väntande order kan då behöva följas upp. Om webhooken inte bekräftar betalningen står ordern kvar som väntande. Om Supabase misslyckas behåller produkten sin tidigare bild. Om PostNord inte svarar kan butiken inte säkert visa ombud eller leveranstid; kunden får ett fel och kan försöka igen.
 
-Steg 5 visar fraktsätten i kassan. Ombudsvalet hämtar PostNords serviceställen
-för postnumret och kräver att kunden väljer ett; hemleverans kräver inget ombud.
-Kassan hämtar prisofferten från Express och visar den leveranstid som PostNord
-returnerar. Prisofferten räknas om när varukorgens produkter eller antal ändras.
-
-Kontrollera lokalt genom att starta shoppen, lägga en produkt i varukorgen och
-gå till kassan. Testa båda fraktsätten, sök ombud med ett svenskt postnummer,
-välj ett ombud och hämta leveranstiden. API-nycklarna och butikens PostNord-
-inställningar måste vara ifyllda i backendens `.env`.
-
-Steg 6 kontrollerar ombuds-ID och landskod mot en ny PostNord-sökning när ordern
-skapas. Backend räknar om varusumma och frakt från databasens produktpriser,
-sparar fraktsätt, fraktpris och ombudsuppgifter i ordern och använder samma
-total i Stripe Checkout. I Stripe visas varor och eventuell frakt som separata
-rader. Orderns administratörsvy visar också fraktsätt, fraktpris och ombud.
-
-För ett lokalt slut-till-slut-test, kör databasmigreringarna och starta shoppen.
-Skapa en order med ombud och en med hemleverans, slutför en Stripe-betalning i
-testläge och kontrollera att webhooken bekräftar ordern. Kontrollera sedan
-orderuppgifterna och fraktbeloppet i adminvyn.
-
-## Kontroller
-
-```powershell
-npm run typecheck
-npm run build
-```
+Tjänsterna innebär beroenden och risker. Algolia, Stripe och lagring kan ändra priser eller villkor, så kostnaden kan växa när användningen ökar. Nycklar måste hållas hemliga och roteras om de läcker. Stripe och fraktflödet hanterar kunduppgifter som namn, adress och e-post; det gör GDPR relevant och innebär att jag behöver veta vilka uppgifter som skickas och hur länge de sparas. Om en leverantör ändrar API eller stänger en funktion kan integrationen sluta fungera tills adaptern uppdateras. Därför har varje integration en egen adapter, validerar svar och har en tidsgräns, men det tar inte bort beroendet av tjänsten.

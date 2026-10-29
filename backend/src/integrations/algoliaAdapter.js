@@ -53,13 +53,16 @@ export async function deleteProductFromSearch(sku) {
   });
 }
 
-export async function searchProducts(query, page, pageSize) {
+export async function searchProducts(query, page, pageSize, categorySlug = null, sort = "relevance") {
   const config = getConfig("search");
-  const response = await request(config, `/1/indexes/${encodeURIComponent(config.indexName)}/query`, {
+  const searchParams = { query, page: page - 1, hitsPerPage: pageSize };
+  if (categorySlug) searchParams.filters = `categorySlug:${categorySlug}`;
+  const indexName = sort === "relevance" ? config.indexName : `${config.indexName}_${sort}`;
+  const response = await request(config, `/1/indexes/${encodeURIComponent(indexName)}/query`, {
     method: "POST",
     apiKey: config.searchApiKey,
     host: `${config.appId}-dsn.algolia.net`,
-    body: { query, page: page - 1, hitsPerPage: pageSize },
+    body: searchParams,
   });
 
   if (!isSearchResponse(response)) throw new AlgoliaError("Algolia returned an invalid search result.");

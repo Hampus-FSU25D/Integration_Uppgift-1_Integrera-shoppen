@@ -61,6 +61,49 @@ test("searches with the search key and validates the response before mapping", a
   assert.deepEqual(result, { hits: [product], totalHits: 21, totalPages: 2, page: 2 });
 });
 
+test("forwards a text query and category filter to Algolia with filtered counts", async () => {
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url, options };
+    return Response.json({ hits: [{ ...product, objectID: "LEV-1" }], nbHits: 13, nbPages: 2, page: 1 });
+  };
+
+  const result = await searchProducts("kakao", 2, 12, "mat");
+
+  assert.deepEqual(JSON.parse(request.options.body), {
+    query: "kakao", page: 1, hitsPerPage: 12, filters: "categorySlug:mat",
+  });
+  assert.deepEqual(result, { hits: [product], totalHits: 13, totalPages: 2, page: 2 });
+});
+
+test("uses the price-sorted replica while keeping query, category, and pagination", async () => {
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url, options };
+    return Response.json({ hits: [{ ...product, objectID: "LEV-1" }], nbHits: 13, nbPages: 2, page: 1 });
+  };
+
+  const result = await searchProducts("kakao", 2, 12, "mat", "price_asc");
+
+  assert.equal(request.url, "https://test-app-dsn.algolia.net/1/indexes/shop_products_price_asc/query");
+  assert.deepEqual(JSON.parse(request.options.body), {
+    query: "kakao", page: 1, hitsPerPage: 12, filters: "categorySlug:mat",
+  });
+  assert.deepEqual(result, { hits: [product], totalHits: 13, totalPages: 2, page: 2 });
+});
+
+test("uses the descending-price replica", async () => {
+  let requestUrl;
+  globalThis.fetch = async (url) => {
+    requestUrl = url;
+    return Response.json({ hits: [], nbHits: 0, nbPages: 0, page: 0 });
+  };
+
+  await searchProducts("", 1, 12, null, "price_desc");
+
+  assert.equal(requestUrl, "https://test-app-dsn.algolia.net/1/indexes/shop_products_price_desc/query");
+});
+
 test("deletes a product by its article number", async () => {
   let request;
   globalThis.fetch = async (url, options) => {

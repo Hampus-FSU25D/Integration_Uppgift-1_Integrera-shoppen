@@ -55,6 +55,8 @@ export type ProductSearchResult = {
   page: number;
 };
 
+export type ProductSort = "relevance" | "price_asc" | "price_desc";
+
 export type AdminProductSaveResult = Product & {
   searchIndexUpdated: boolean;
   searchIndexError?: string;
@@ -75,8 +77,16 @@ export function getActiveProducts() {
   return apiRequest<Product[]>("/products");
 }
 
-export function searchActiveProducts(query: string, page: number, pageSize = 12) {
+export function searchActiveProducts(
+  query: string,
+  page: number,
+  pageSize = 12,
+  categorySlug?: string,
+  sort: ProductSort = "relevance",
+) {
   const params = new URLSearchParams({ query, page: String(page), pageSize: String(pageSize) });
+  if (categorySlug) params.set("category", categorySlug);
+  if (sort !== "relevance") params.set("sort", sort);
   return apiRequest<ProductSearchResult>(`/search?${params}`);
 }
 

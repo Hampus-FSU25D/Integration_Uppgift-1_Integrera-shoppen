@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CategoryFilter } from "../../components/CategoryFilter";
 import { ProductCard } from "../../components/ProductCard";
-import { getActiveProducts, getCategories, searchActiveProducts, type Category, type Product, type ProductSearchResult } from "../../services/productService";
+import { getCategories, searchActiveProducts, type Category, type Product, type ProductSearchResult, type ProductSort } from "../../services/productService";
 
 type LoadState = "loading" | "ready" | "error";
 const PRODUCTS_PER_PAGE = 12;
@@ -20,6 +20,7 @@ export function ProductListPage() {
   const [result, setResult] = useState<ProductSearchResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState(readProductSearch);
+  const [sort, setSort] = useState<ProductSort>("relevance");
   const [page, setPage] = useState(readPage);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -38,21 +39,7 @@ export function ProductListPage() {
     let active = true;
     setLoadState("loading");
     setErrorMessage("");
-    const loadProducts = selectedCategory
-      ? getActiveProducts().then((products) => {
-        const query = searchQuery.toLocaleLowerCase();
-        const matches = products.filter((product) => product.categorySlug === selectedCategory &&
-          (!query || [product.name, product.description, product.brand, product.sku]
-            .some((value) => value?.toLocaleLowerCase().includes(query))));
-        const totalPages = Math.ceil(matches.length / PRODUCTS_PER_PAGE);
-        return {
-          hits: matches.slice((page - 1) * PRODUCTS_PER_PAGE, page * PRODUCTS_PER_PAGE),
-          totalHits: matches.length,
-          totalPages,
-          page,
-        };
-      })
-      : searchActiveProducts(searchQuery, page, PRODUCTS_PER_PAGE);
+    const loadProducts = searchActiveProducts(searchQuery, page, PRODUCTS_PER_PAGE, selectedCategory || undefined, sort);
     loadProducts.then((searchResult) => {
       if (!active) return;
       setResult(searchResult);
@@ -64,7 +51,7 @@ export function ProductListPage() {
       setLoadState("error");
     });
     return () => { active = false; };
-  }, [searchQuery, page, selectedCategory]);
+  }, [searchQuery, page, selectedCategory, sort]);
 
   useEffect(() => {
     function handleNavigation() {
@@ -115,6 +102,17 @@ export function ProductListPage() {
               </p>
             )}
           </div>
+          <label className="filter-field search-sort-control">
+            Sortera efter
+            <select value={sort} onChange={(event) => {
+              setSort(event.target.value as ProductSort);
+              changePage(1);
+            }}>
+              <option value="relevance">Relevans</option>
+              <option value="price_asc">Pris: lägst först</option>
+              <option value="price_desc">Pris: högst först</option>
+            </select>
+          </label>
         </div>
 
         {loadState === "loading" ? <p role="status">Söker produkter…</p> : null}

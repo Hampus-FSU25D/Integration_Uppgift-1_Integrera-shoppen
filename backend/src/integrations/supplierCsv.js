@@ -25,7 +25,11 @@ export function parseSupplierCsv(csv) {
       });
       return;
     }
-    rows.push(Object.fromEntries(headers.map((header, column) => [header, values[column]])));
+    const row = Object.fromEntries(headers.map((header, column) => [header, values[column]]));
+    if (typeof row.varianter === "string") {
+      row.varianter = row.varianter.split("|").map((variant) => variant.trim()).filter(Boolean);
+    }
+    rows.push(row);
   });
   return { rows, skipped };
 }

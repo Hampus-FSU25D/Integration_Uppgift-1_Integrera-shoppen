@@ -8,9 +8,8 @@ import session from "express-session";
 import { pool } from "./db/pool.js";
 import { importSupplierCatalog } from "./integrations/supplierImport.js";
 import { SupplierApiError } from "./integrations/supplierAdapter.js";
-import { AlgoliaError, searchProducts } from "./integrations/algoliaAdapter.js";
 import { syncProductsToSearch } from "./integrations/productSearchSync.js";
-import { parseSearchParams, SearchParameterError } from "./integrations/searchParams.js";
+import { createSearchRouter } from "./integrations/searchRoutes.js";
 import { createOrderPaymentRouter } from "./integrations/orderPaymentRoutes.js";
 import { createOrderCheckoutRouter } from "./integrations/orderCheckoutRoutes.js";
 import { createStripeWebhookRouter } from "./integrations/stripeWebhookRoutes.js";
@@ -68,6 +67,7 @@ app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 app.use("/api/shipping/delivery-estimate", createPostNordDeliveryEstimateRouter());
 app.use("/api/shipping/quote", createShippingQuoteRouter({ database: pool }));
+app.use("/api/search", createSearchRouter());
 
 app.get("/api/health", async (_request, response) => {
   try {
@@ -151,23 +151,6 @@ app.get("/api/categories", async (_request, response, next) => {
     const result = await pool.query("select id, name, slug from categories order by name");
     return response.json(result.rows);
   } catch (error) {
-    return next(error);
-  }
-});
-
-app.get("/api/search", async (request, response, next) => {
-  let params;
-  try {
-    params = parseSearchParams(request.query);
-  } catch (error) {
-    if (error instanceof SearchParameterError) return response.status(400).json({ error: error.message });
-    return next(error);
-  }
-
-  try {
-    return response.json(await searchProducts(params.query, params.page, params.pageSize));
-  } catch (error) {
-    if (error instanceof AlgoliaError) return response.status(502).json({ error: error.message });
     return next(error);
   }
 });

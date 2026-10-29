@@ -4,10 +4,23 @@ export function parseSearchParams(params) {
     throw new SearchParameterError("Search query must be text with at most 200 characters.");
   }
 
+  const categorySlug = params.category === undefined ? null : params.category;
+  if (categorySlug !== null && (typeof categorySlug !== "string" || categorySlug.length > 100 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(categorySlug))) {
+    throw new SearchParameterError("category must be a valid category slug.");
+  }
+
+  const sort = params.sort === undefined ? "relevance" : params.sort;
+  if (sort !== "relevance" && sort !== "price_asc" && sort !== "price_desc") {
+    throw new SearchParameterError("sort must be relevance, price_asc, or price_desc.");
+  }
+
   return {
     query: query.trim(),
     page: parsePositiveInteger(params.page, "page", 1),
     pageSize: parsePositiveInteger(params.pageSize, "pageSize", 12, 50),
+    categorySlug,
+    sort,
   };
 }
 

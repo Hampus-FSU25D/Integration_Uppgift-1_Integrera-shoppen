@@ -384,6 +384,10 @@ img {
   margin-bottom: 28px;
 }
 
+.search-sort-control {
+  min-width: 210px;
+}
+
 .page-heading h1,
 .placeholder h1,
 .admin-page h1 {
