@@ -64,6 +64,39 @@ export async function uploadProductImage(image, { env = process.env, fetchImpl =
   };
 }
 
+export async function deleteProductImage(path, { env = process.env, fetchImpl = fetch } = {}) {
+  if (typeof path !== "string" || !/^products\/[0-9a-f-]+\.(jpg|png)$/i.test(path)) {
+    throw new SupabaseStorageError("Den sparade Storage-sökvägen för bilden är ogiltig.");
+  }
+
+  const config = getConfig(env);
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const encodedBucket = encodeURIComponent(config.bucket);
+  let response;
+
+  try {
+    response = await fetchImpl(`${config.storageUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`, {
+      method: "DELETE",
+      headers: {
+        apikey: config.apiKey,
+        ...(config.useLegacyBearer ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+      },
+      signal: AbortSignal.timeout(requestTimeoutMs),
+    });
+  } catch (error) {
+    const message = error?.name === "TimeoutError"
+      ? "Supabase Storage svarade inte i tid vid borttagning av den gamla bilden."
+      : "Kunde inte nå Supabase Storage för att ta bort den gamla bilden.";
+    throw new SupabaseStorageError(message, { cause: error });
+  }
+
+  if (!response.ok) {
+    throw new SupabaseStorageError(`Supabase Storage kunde inte ta bort den gamla bilden (HTTP ${response.status}).`, {
+      status: response.status,
+    });
+  }
+}
+
 function validateProductImage(image) {
   if (!image || !(image.data instanceof Uint8Array)) {
     throw new ProductImageValidationError("Ingen giltig bildfil skickades.");

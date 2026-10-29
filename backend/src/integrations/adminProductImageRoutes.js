@@ -4,6 +4,7 @@ import {
   MAX_PRODUCT_IMAGE_SIZE_BYTES,
   ProductImageValidationError,
   SupabaseStorageError,
+  deleteProductImage,
   uploadProductImage,
 } from "./supabaseStorageAdapter.js";
 
@@ -12,7 +13,12 @@ const parseProductImage = multer({
   limits: { fileSize: MAX_PRODUCT_IMAGE_SIZE_BYTES, files: 1, fields: 0, parts: 1 },
 }).single("image");
 
-export function createAdminProductImageRouter({ requireAdmin, database, uploadImage = uploadProductImage }) {
+export function createAdminProductImageRouter({
+  requireAdmin,
+  database,
+  uploadImage = uploadProductImage,
+  deleteImage = deleteProductImage,
+}) {
   const router = express.Router();
 
   router.post("/:productId/image", requireAdmin, (request, response, next) => {
@@ -36,15 +42,41 @@ export function createAdminProductImageRouter({ requireAdmin, database, uploadIm
     if (!isUuid(request.params.productId)) return response.status(400).json({ error: "Produktens ID är ogiltigt." });
 
     try {
-      const product = await database.query("select id from products where id=$1", [request.params.productId]);
+      const product = await database.query("select id,image_storage_path from products where id=$1", [request.params.productId]);
       if (!product.rowCount) return response.status(404).json({ error: "Produkten hittades inte." });
 
       const image = await uploadImage({ data: request.file.buffer, contentType: request.file.mimetype });
-      const result = await database.query(
-        "update products set image_storage_path=$1, image_url=$2, updated_at=now() where id=$3 returning id",
-        [image.path, image.publicUrl, request.params.productId],
-      );
-      if (!result.rowCount) return response.status(404).json({ error: "Produkten hittades inte." });
+      let result;
+      try {
+        result = await database.query(
+          "update products set image_storage_path=$1, image_url=$2, updated_at=now() where id=$3 returning id",
+          [image.path, image.publicUrl, request.params.productId],
+        );
+      } catch (error) {
+        try {
+          await deleteImage(image.path);
+        } catch {
+          // The database still points to the old image; the uploaded object is orphaned.
+        }
+        throw error;
+      }
+      if (!result.rowCount) {
+        try {
+          await deleteImage(image.path);
+        } catch {
+          // Keep the response about the missing database product.
+        }
+        return response.status(404).json({ error: "Produkten hittades inte." });
+      }
+
+      const oldImagePath = product.rows?.[0]?.image_storage_path;
+      if (oldImagePath && oldImagePath !== image.path) {
+        try {
+          await deleteImage(oldImagePath);
+        } catch {
+          return response.status(201).json({ productId: request.params.productId, ...image, cleanupWarning: true });
+        }
+      }
       return response.status(201).json({ productId: request.params.productId, ...image });
     } catch (error) {
       if (error instanceof ProductImageValidationError) {

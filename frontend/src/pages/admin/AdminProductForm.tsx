@@ -47,7 +47,9 @@ export function AdminProductForm({
     try {
       const image = await uploadAdminProductImage(productId, file);
       setValues((current) => ({ ...current, imageUrl: image.publicUrl }));
-      setImageMessage("Bilden laddades upp och sparades på produkten.");
+      setImageMessage(image.cleanupWarning
+        ? "Bilden sparades, men den gamla Storage-bilden kunde inte tas bort."
+        : "Bilden laddades upp och sparades på produkten.");
     } catch (error) {
       setImageMessage(error instanceof Error ? error.message : "Bilden kunde inte laddas upp.");
     } finally {

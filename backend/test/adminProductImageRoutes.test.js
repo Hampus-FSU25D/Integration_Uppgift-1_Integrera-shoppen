@@ -32,7 +32,7 @@ test("admin can upload one image and receives only its public metadata", async (
   });
   assert.deepEqual(uploadedImage, { data: Buffer.from(pngBytes), contentType: "image/png" });
   assert.deepEqual(queries.map(({ sql }) => sql), [
-    "select id from products where id=$1",
+    "select id,image_storage_path from products where id=$1",
     "update products set image_storage_path=$1, image_url=$2, updated_at=now() where id=$3 returning id",
   ]);
   assert.deepEqual(queries[1].values, ["products/uuid.png", "https://images.example.com/image.png", productId]);
@@ -105,7 +105,7 @@ test("does not update the product image when Storage upload fails", async () => 
   });
 
   assert.equal(result.response.status, 502);
-  assert.deepEqual(queries, ["select id from products where id=$1"]);
+  assert.deepEqual(queries, ["select id,image_storage_path from products where id=$1"]);
 });
 
 async function uploadRequest({

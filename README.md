@@ -92,7 +92,8 @@ gräns. Administratörer kan skicka en fil i multipart-fältet `image` till
 Vid en lyckad uppladdning sparas Storage-sökvägen i `image_storage_path` och den
 publika HTTPS-adressen i `image_url` för produkten. Databasmigreringen körs vid
 backendens start. I produktens adminformulär kan en JPEG- eller PNG-fil laddas
-upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ.
+upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ. Vid byte
+sparas den nya bilden innan den gamla Storage-filen tas bort.
 
 ## Kontroller
 

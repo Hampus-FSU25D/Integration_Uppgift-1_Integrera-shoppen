@@ -64,6 +64,7 @@ export type ProductImageUploadResult = {
   productId: string;
   path: string;
   publicUrl: string;
+  cleanupWarning?: boolean;
 };
 
 export function getCategories() {
