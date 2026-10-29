@@ -1,10 +1,12 @@
-import { FormEvent, useState } from "react";
-import type { Category, ProductFormInput } from "../../services/productService";
+import { useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { uploadAdminProductImage, type Category, type ProductFormInput } from "../../services/productService";
 
 type AdminProductFormProps = {
   categories: Category[];
   initialValues: ProductFormInput;
   submitLabel: string;
+  productId?: string;
   isSubmitting: boolean;
   onSubmit: (input: ProductFormInput) => void;
 };
@@ -13,14 +15,44 @@ export function AdminProductForm({
   categories,
   initialValues,
   submitLabel,
+  productId,
   isSubmitting,
   onSubmit,
 }: AdminProductFormProps) {
   const [values, setValues] = useState<ProductFormInput>(initialValues);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageMessage, setImageMessage] = useState("");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isUploadingImage) return;
     onSubmit(values);
+  }
+
+  async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setImageMessage("Bilden får vara högst 5 MiB.");
+      return;
+    }
+    if (!productId) {
+      setImageMessage("Spara produkten först, så kan du sedan ladda upp bilden.");
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setImageMessage("Laddar upp bilden...");
+    try {
+      const image = await uploadAdminProductImage(productId, file);
+      setValues((current) => ({ ...current, imageUrl: image.publicUrl }));
+      setImageMessage("Bilden laddades upp och sparades på produkten.");
+    } catch (error) {
+      setImageMessage(error instanceof Error ? error.message : "Bilden kunde inte laddas upp.");
+    } finally {
+      setIsUploadingImage(false);
+    }
   }
 
   return (
@@ -141,6 +173,17 @@ export function AdminProductForm({
               onChange={(event) => setValues({ ...values, imageUrl: event.target.value })}
             />
           </label>
+          <label>
+            Ladda upp bild (JPEG eller PNG, max 5 MiB)
+            <input
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleImageChange}
+              disabled={!productId || isSubmitting || isUploadingImage}
+            />
+          </label>
+          {!productId && <p>Spara produkten först för att aktivera bilduppladdning.</p>}
+          {imageMessage && <p className="form-message" role="status">{imageMessage}</p>}
         </section>
 
         <section className="admin-card form-section">
@@ -153,7 +196,7 @@ export function AdminProductForm({
             />
             Aktiv produkt
           </label>
-          <button type="submit" disabled={isSubmitting}>
+          <button type="submit" disabled={isSubmitting || isUploadingImage}>
             {isSubmitting ? "Sparar..." : submitLabel}
           </button>
         </section>

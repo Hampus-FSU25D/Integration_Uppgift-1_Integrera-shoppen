@@ -91,7 +91,8 @@ gräns. Administratörer kan skicka en fil i multipart-fältet `image` till
 `POST /api/admin/products/:id/image` med headern `X-Requested-With: XMLHttpRequest`.
 Vid en lyckad uppladdning sparas Storage-sökvägen i `image_storage_path` och den
 publika HTTPS-adressen i `image_url` för produkten. Databasmigreringen körs vid
-backendens start.
+backendens start. I produktens adminformulär kan en JPEG- eller PNG-fil laddas
+upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ.
 
 ## Kontroller
 

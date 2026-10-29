@@ -60,6 +60,12 @@ export type AdminProductSaveResult = Product & {
   searchIndexError?: string;
 };
 
+export type ProductImageUploadResult = {
+  productId: string;
+  path: string;
+  publicUrl: string;
+};
+
 export function getCategories() {
   return apiRequest<Category[]>("/categories");
 }
@@ -101,6 +107,16 @@ export function createAdminProduct(input: ProductFormInput) {
 
 export function updateAdminProduct(id: string, input: ProductFormInput) {
   return apiRequest<AdminProductSaveResult>(`/admin/products/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function uploadAdminProductImage(id: string, file: File) {
+  const form = new FormData();
+  form.append("image", file);
+  return apiRequest<ProductImageUploadResult>(`/admin/products/${encodeURIComponent(id)}/image`, {
+    method: "POST",
+    body: form,
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+  });
 }
 
 export function deleteAdminProduct(id: string) {

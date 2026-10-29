@@ -125,6 +125,7 @@ export function AdminProductEditPage({ path }: PageProps) {
         categories={categories}
         initialValues={mapProductToFormInput(product)}
         submitLabel="Spara ändringar"
+        productId={productId}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
       />
