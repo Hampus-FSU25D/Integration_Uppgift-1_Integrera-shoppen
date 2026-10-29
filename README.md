@@ -82,6 +82,13 @@ Efter ett testkop ska ordern visas som **Betald** i admin och produktlagret
 minska med bestallt antal. Stripe-metadata innehaller hela orderns UUID.
 Adminlistan visar ett kort prefix och orderdetaljsidan visar hela numret.
 
+## Labb 4 - produktbilder
+
+Serverns Supabase Storage-adapter accepterar JPEG- och PNG-innehåll som matchar
+filens format. Maxstorleken är 5 MiB (5 242 880 byte); större filer avvisas
+innan något skickas till Storage. Den inkommande uppladdningsrouten får samma
+gräns när den läggs till i ett senare steg.
+
 ## Kontroller
 
 ```powershell

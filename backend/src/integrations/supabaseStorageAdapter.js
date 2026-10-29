@@ -2,6 +2,19 @@ import { randomUUID } from "node:crypto";
 
 const requestTimeoutMs = 10_000;
 const imageExtensions = { "image/jpeg": "jpg", "image/png": "png" };
+const imageSignatures = {
+  "image/jpeg": [0xff, 0xd8, 0xff],
+  "image/png": [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+};
+export const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
+export class ProductImageValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ProductImageValidationError";
+    this.status = 400;
+  }
+}
 
 export class SupabaseStorageError extends Error {
   constructor(message, options = {}) {
@@ -11,11 +24,8 @@ export class SupabaseStorageError extends Error {
 }
 
 export async function uploadProductImage(image, { env = process.env, fetchImpl = fetch } = {}) {
+  const extension = validateProductImage(image);
   const config = getConfig(env);
-  const extension = Object.hasOwn(imageExtensions, image.contentType) ? imageExtensions[image.contentType] : undefined;
-  if (!extension) {
-    throw new SupabaseStorageError("Produktbilden måste vara en JPEG- eller PNG-fil.");
-  }
 
   const path = `products/${randomUUID()}.${extension}`;
   const encodedPath = path.split("/").map(encodeURIComponent).join("/");
@@ -52,6 +62,28 @@ export async function uploadProductImage(image, { env = process.env, fetchImpl =
     path,
     publicUrl: `${config.publicUrl}/storage/v1/object/public/${encodedBucket}/${encodedPath}`,
   };
+}
+
+function validateProductImage(image) {
+  if (!image || !(image.data instanceof Uint8Array)) {
+    throw new ProductImageValidationError("Ingen giltig bildfil skickades.");
+  }
+
+  if (!Object.hasOwn(imageExtensions, image.contentType)) {
+    throw new ProductImageValidationError("Filen måste vara en JPEG- eller PNG-fil.");
+  }
+
+  if (image.data.byteLength > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+    throw new ProductImageValidationError("Filen får vara högst 5 MiB (5 242 880 byte).");
+  }
+
+  const signature = imageSignatures[image.contentType];
+  const matchesSignature = signature.every((byte, index) => image.data[index] === byte);
+  if (!matchesSignature) {
+    throw new ProductImageValidationError("Filinnehållet stämmer inte med JPEG- eller PNG-formatet.");
+  }
+
+  return imageExtensions[image.contentType];
 }
 
 function getConfig(env) {
