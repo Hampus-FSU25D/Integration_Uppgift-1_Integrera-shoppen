@@ -1,5 +1,6 @@
 import type { CartItem } from "../cart/CartContext";
 import { apiRequest } from "../lib/api";
+import type { ServicePoint, ShippingMethod } from "./shippingService";
 
 export type CheckoutInput = {
   customerName: string;
@@ -9,10 +10,21 @@ export type CheckoutInput = {
   shippingPostalCode: string;
   shippingCity: string;
   shippingCountry: string;
+  shippingMethod: ShippingMethod;
+  selectedServicePoint: ServicePoint | null;
   items: CartItem[];
 };
 
-export type CreatedOrder = { id: string; totalPrice: number; paymentToken?: string; status?: OrderStatus };
+export type CreatedOrder = {
+  id: string;
+  totalPrice: number;
+  subtotalPrice?: number;
+  shippingPrice?: number;
+  shippingMethod?: ShippingMethod;
+  servicePoint?: ServicePoint | null;
+  paymentToken?: string;
+  status?: OrderStatus;
+};
 export type CheckoutSession = { id: string; url: string };
 export type OrderStatus = "pending" | "confirmed" | "processing" | "delivered" | "cancelled" | "refunded";
 export type AdminOrderListItem = {
@@ -37,6 +49,9 @@ export type AdminOrderDetails = AdminOrderListItem & {
   shippingPostalCode: string | null;
   shippingCity: string | null;
   shippingCountry: string | null;
+  shippingMethod: ShippingMethod;
+  shippingPrice: number;
+  servicePoint: ServicePoint | null;
   updatedAt: string;
   items: AdminOrderItem[];
 };

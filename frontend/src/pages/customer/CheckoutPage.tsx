@@ -148,6 +148,8 @@ export function CheckoutPage() {
             shippingPostalCode,
             shippingCity,
             shippingCountry,
+            shippingMethod,
+            selectedServicePoint,
             items,
           });
         } catch {

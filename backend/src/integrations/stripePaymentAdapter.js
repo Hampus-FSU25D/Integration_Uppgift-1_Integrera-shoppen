@@ -13,7 +13,7 @@ export async function createStripeCheckoutSession(orderId, {
   let order;
   try {
     const result = await database.query(
-      "select id,customer_email,total_price,status from orders where id=$1",
+      "select id,customer_email,total_price,shipping_price,shipping_method,status from orders where id=$1",
       [orderId],
     );
     order = result.rows[0];
@@ -29,6 +29,12 @@ export async function createStripeCheckoutSession(orderId, {
 
   const amount = toMinorUnits(order.total_price);
   if (amount === null || amount <= 0) throw new StripePaymentError("Order total is not a valid SEK amount.");
+  const shippingAmount = toMinorUnits(order.shipping_price ?? "0");
+  if (shippingAmount === null || shippingAmount > amount) {
+    throw new StripePaymentError("Order shipping price is not a valid SEK amount.");
+  }
+  const productAmount = amount - shippingAmount;
+  if (productAmount <= 0) throw new StripePaymentError("Order product subtotal is not a valid SEK amount.");
 
   const apiKey = env.STRIPE_SECRET_KEY;
   if (typeof apiKey !== "string" || !/^sk_test_[A-Za-z0-9]+$/.test(apiKey)) {
@@ -57,10 +63,17 @@ export async function createStripeCheckoutSession(orderId, {
         quantity: 1,
         price_data: {
           currency: "sek",
-          unit_amount: amount,
-          product_data: { name: `Order ${orderNumber}` },
+          unit_amount: productAmount,
+          product_data: { name: `Products ${orderNumber}` },
         },
-      }],
+      }, ...(shippingAmount > 0 ? [{
+        quantity: 1,
+        price_data: {
+          currency: "sek",
+          unit_amount: shippingAmount,
+          product_data: { name: order.shipping_method === "service-point" ? "Frakt till ombud" : "Hemleverans" },
+        },
+      }] : [])],
     });
   } catch {
     throw new StripePaymentError("Stripe Checkout is unavailable. Please try again later.");

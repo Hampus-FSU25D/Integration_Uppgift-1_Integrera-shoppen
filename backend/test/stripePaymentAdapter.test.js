@@ -25,7 +25,7 @@ function dependencies(order, session = { id: "cs_test_example", url: "https://ch
 }
 
 test("creates a SEK Checkout Session using the pending order total from the database", async () => {
-  const deps = dependencies({ id: "550e8400-e29b-41d4-a716-446655440000", status: "pending", customer_email: "buyer@example.com", total_price: "123.45" });
+  const deps = dependencies({ id: "550e8400-e29b-41d4-a716-446655440000", status: "pending", customer_email: "buyer@example.com", total_price: "123.45", shipping_price: "0.00" });
 
   const result = await createStripeCheckoutSession("550e8400-e29b-41d4-a716-446655440000", {
     ...deps, env: { ...validEnvironment },
@@ -42,7 +42,26 @@ test("creates a SEK Checkout Session using the pending order total from the data
   assert.deepEqual(params.metadata, { orderId: "550e8400-e29b-41d4-a716-446655440000", orderNumber: "#550e8400" });
   assert.equal(params.payment_intent_data.description, "Order #550e8400");
   assert.deepEqual(params.payment_intent_data.metadata, params.metadata);
-  assert.equal(params.line_items[0].price_data.product_data.name, "Order #550e8400");
+  assert.equal(params.line_items[0].price_data.product_data.name, "Products #550e8400");
+});
+
+test("adds saved shipping as a separate Stripe line item", async () => {
+  const order = {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    status: "pending",
+    customer_email: "buyer@example.com",
+    total_price: "83.68",
+    shipping_price: "59.00",
+    shipping_method: "service-point",
+  };
+  const deps = dependencies(order);
+  await createStripeCheckoutSession(order.id, { ...deps, env: validEnvironment });
+
+  const [params] = deps.calls.find((call) => call.type === "stripe").args;
+  assert.equal(params.line_items.length, 2);
+  assert.equal(params.line_items[0].price_data.unit_amount, 2468);
+  assert.equal(params.line_items[1].price_data.unit_amount, 5900);
+  assert.equal(params.line_items[1].price_data.product_data.name, "Frakt till ombud");
 });
 
 test("rejects malformed order IDs before querying the database", async () => {

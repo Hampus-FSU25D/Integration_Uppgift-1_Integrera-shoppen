@@ -168,6 +168,17 @@ gå till kassan. Testa båda fraktsätten, sök ombud med ett svenskt postnummer
 välj ett ombud och hämta leveranstiden. API-nycklarna och butikens PostNord-
 inställningar måste vara ifyllda i backendens `.env`.
 
+Steg 6 kontrollerar ombuds-ID och landskod mot en ny PostNord-sökning när ordern
+skapas. Backend räknar om varusumma och frakt från databasens produktpriser,
+sparar fraktsätt, fraktpris och ombudsuppgifter i ordern och använder samma
+total i Stripe Checkout. I Stripe visas varor och eventuell frakt som separata
+rader. Orderns administratörsvy visar också fraktsätt, fraktpris och ombud.
+
+För ett lokalt slut-till-slut-test, kör databasmigreringarna och starta shoppen.
+Skapa en order med ombud och en med hemleverans, slutför en Stripe-betalning i
+testläge och kontrollera att webhooken bekräftar ordern. Kontrollera sedan
+orderuppgifterna och fraktbeloppet i adminvyn.
+
 ## Kontroller
 
 ```powershell

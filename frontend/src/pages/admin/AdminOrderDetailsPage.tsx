@@ -161,6 +161,22 @@ export function AdminOrderDetailsPage({ path }: PageProps) {
               <dt>Land</dt>
               <dd>{order.shippingCountry || "-"}</dd>
             </div>
+            <div>
+              <dt>Fraktsätt</dt>
+              <dd>{order.shippingMethod === "home" ? "Hemleverans" : "Ombud"}</dd>
+            </div>
+            <div>
+              <dt>Fraktpris</dt>
+              <dd>{formatPrice(order.shippingPrice)}</dd>
+            </div>
+            {order.servicePoint && (
+              <div>
+                <dt>Valt ombud</dt>
+                <dd>
+                  {order.servicePoint.name}, {order.servicePoint.address}, {order.servicePoint.postalCode} {order.servicePoint.city}
+                </dd>
+              </div>
+            )}
           </dl>
         </section>
       </div>
@@ -189,8 +205,16 @@ export function AdminOrderDetailsPage({ path }: PageProps) {
             </tbody>
             <tfoot>
               <tr>
-                <th colSpan={3}>Total</th>
+                <th colSpan={3}>Delsumma varor</th>
                 <td>{formatPrice(itemTotal)}</td>
+              </tr>
+              <tr>
+                <th colSpan={3}>Frakt</th>
+                <td>{formatPrice(order.shippingPrice)}</td>
+              </tr>
+              <tr>
+                <th colSpan={3}>Totalt</th>
+                <td>{formatPrice(order.totalPrice)}</td>
               </tr>
             </tfoot>
           </table>

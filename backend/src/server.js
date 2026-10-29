@@ -11,7 +11,8 @@ import { SupplierApiError } from "./integrations/supplierAdapter.js";
 import { AlgoliaError, searchProducts } from "./integrations/algoliaAdapter.js";
 import { syncProductsToSearch } from "./integrations/productSearchSync.js";
 import { parseSearchParams, SearchParameterError } from "./integrations/searchParams.js";
-import { createGuestPaymentCredential, createOrderPaymentRouter } from "./integrations/orderPaymentRoutes.js";
+import { createOrderPaymentRouter } from "./integrations/orderPaymentRoutes.js";
+import { createOrderCheckoutRouter } from "./integrations/orderCheckoutRoutes.js";
 import { createStripeWebhookRouter } from "./integrations/stripeWebhookRoutes.js";
 import { createAdminProductImageRouter } from "./integrations/adminProductImageRoutes.js";
 import { createPostNordServicePointRouter } from "./integrations/postNordServicePointRoutes.js";
@@ -62,6 +63,7 @@ app.use(
   }),
 );
 app.use("/api/admin/products", createAdminProductImageRouter({ requireAdmin, database: pool }));
+app.use("/api/orders", createOrderCheckoutRouter({ database: pool }));
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 app.use("/api/shipping/delivery-estimate", createPostNordDeliveryEstimateRouter());
@@ -345,64 +347,6 @@ app.put("/api/cart", requireUser, async (request, response, next) => {
   }
 });
 
-app.post("/api/orders", async (request, response, next) => {
-  const input = validateCheckout(request.body);
-  if (!input) return response.status(400).json({ error: "Checkout details or items are invalid." });
-
-  const quantities = new Map();
-  for (const item of input.items) quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
-  const guestPaymentCredential = request.session.userId ? null : createGuestPaymentCredential();
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
-    const productIds = [...quantities.keys()];
-    const products = await client.query(
-      "select id, name, price, stock from products where id = any($1::uuid[]) and is_active=true for update",
-      [productIds],
-    );
-    if (products.rowCount !== productIds.length) throw new CheckoutError("One or more products are unavailable.");
-
-    let total = 0;
-    const orderLines = [];
-    for (const product of products.rows) {
-      const quantity = quantities.get(product.id);
-      if (quantity <= 0 || quantity > product.stock) throw new CheckoutError("Requested quantity exceeds available stock.");
-      const price = Number(product.price);
-      total += price * quantity;
-      orderLines.push({ product, quantity, price });
-    }
-    if (total <= 0) throw new CheckoutError("Order total must be greater than zero.");
-
-    const orderResult = await client.query(
-      `insert into orders (user_id, customer_name, customer_email, customer_phone, shipping_address,
-       shipping_postal_code, shipping_city, shipping_country, total_price, status, guest_payment_token_hash)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10) returning id,total_price`,
-      [request.session.userId ?? null, input.customerName, input.customerEmail, input.customerPhone,
-        input.shippingAddress, input.shippingPostalCode, input.shippingCity, input.shippingCountry, total,
-        guestPaymentCredential?.tokenHash ?? null],
-    );
-    const order = orderResult.rows[0];
-    for (const line of orderLines) {
-      await client.query(
-        "insert into order_items (order_id, product_id, product_name, quantity, price_at_purchase) values ($1,$2,$3,$4,$5)",
-        [order.id, line.product.id, line.product.name, line.quantity, line.price],
-      );
-    }
-    await client.query("commit");
-    return response.status(201).json({
-      id: order.id,
-      totalPrice: Number(order.total_price),
-      ...(guestPaymentCredential ? { paymentToken: guestPaymentCredential.token } : {}),
-    });
-  } catch (error) {
-    await client.query("rollback");
-    if (error instanceof CheckoutError) return response.status(400).json({ error: error.message });
-    return next(error);
-  } finally {
-    client.release();
-  }
-});
-
 app.get("/api/orders/:id/summary", async (request, response, next) => {
   try {
     const result = await pool.query("select id,total_price,status from orders where id=$1", [request.params.id]);
@@ -562,20 +506,6 @@ function isUuid(value) {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function validateCheckout(value) {
-  if (!value || typeof value !== "object" || !Array.isArray(value.items) || value.items.length === 0) return null;
-  const fields = ["customerName", "customerEmail", "customerPhone", "shippingAddress", "shippingPostalCode", "shippingCity", "shippingCountry"];
-  if (fields.some((field) => typeof value[field] !== "string" || !value[field].trim() || value[field].length > 300)) return null;
-  if (!isValidEmail(normalizeEmail(value.customerEmail))) return null;
-  if (value.items.some((item) => !isCartInput(item))) return null;
-  return {
-    customerName: value.customerName.trim(), customerEmail: normalizeEmail(value.customerEmail),
-    customerPhone: value.customerPhone.trim(), shippingAddress: value.shippingAddress.trim(),
-    shippingPostalCode: value.shippingPostalCode.trim(), shippingCity: value.shippingCity.trim(),
-    shippingCountry: value.shippingCountry.trim(), items: value.items,
-  };
-}
-
 async function getOrCreateCart(userId, client = pool) {
   const result = await client.query(
     `insert into carts (user_id) values ($1) on conflict (user_id) do update set updated_at=now() returning id`,
@@ -603,6 +533,16 @@ function mapShipping(row) {
     shippingPostalCode: row.shipping_postal_code,
     shippingCity: row.shipping_city,
     shippingCountry: row.shipping_country,
+    shippingMethod: row.shipping_method,
+    shippingPrice: Number(row.shipping_price ?? 0),
+    servicePoint: row.service_point_id ? {
+      id: row.service_point_id,
+      countryCode: row.service_point_country_code,
+      name: row.service_point_name,
+      address: row.service_point_address,
+      postalCode: row.service_point_postal_code,
+      city: row.service_point_city,
+    } : null,
   };
 }
 
@@ -615,5 +555,3 @@ function mapOrderItem(row) {
     priceAtPurchase: Number(row.price_at_purchase),
   };
 }
-
-class CheckoutError extends Error {}
