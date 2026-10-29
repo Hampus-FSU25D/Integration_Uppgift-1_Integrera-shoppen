@@ -65,6 +65,93 @@ export async function getNearbyServicePoints(postalCode, { env = process.env, fe
   return points.map(mapServicePoint);
 }
 
+export async function getDeliveryEstimate({ postalCode, deliveryType }, {
+  env = process.env,
+  fetchImpl = fetch,
+  now = () => new Date(),
+} = {}) {
+  const destinationPostalCode = normalizeSwedishPostalCode(postalCode);
+  if (!destinationPostalCode) {
+    throw new PostNordApiError("Ange ett giltigt svenskt postnummer för leveransen.", { status: 400 });
+  }
+  if (deliveryType !== "home" && deliveryType !== "service-point") {
+    throw new PostNordApiError("Välj ett giltigt fraktsätt.", { status: 400 });
+  }
+
+  const config = getConfig(env);
+  const customerKey = env.POSTNORD_CUSTOMER_KEY;
+  const originPostalCode = normalizeSwedishPostalCode(env.POSTNORD_ORIGIN_POSTAL_CODE);
+  if (!customerKey || !originPostalCode) {
+    throw new PostNordApiError(
+      "PostNord-leveransberäkning är inte konfigurerad. Ange POSTNORD_CUSTOMER_KEY och POSTNORD_ORIGIN_POSTAL_CODE på backend.",
+      { status: 503 },
+    );
+  }
+
+  const url = new URL("/rest/shipment/v1/deliveryoptions/bywarehouse", config.baseUrl);
+  url.searchParams.set("apikey", config.apiKey);
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        warehouses: [{
+          id: "shop",
+          address: { postCode: originPostalCode, countryCode: "SE" },
+          orderHandling: { handOverTimer: now().toISOString() },
+        }],
+        customer: { customerKey },
+        recipient: { address: { postCode: destinationPostalCode, countryCode: "SE" } },
+      }),
+      signal: AbortSignal.timeout(requestTimeoutMs),
+    });
+  } catch (error) {
+    const message = error?.name === "TimeoutError"
+      ? "PostNord svarade inte i tid. Försök igen."
+      : "Kunde inte nå PostNord. Försök igen senare.";
+    throw new PostNordApiError(message, { cause: error, status: 502 });
+  }
+
+  if (!response.ok) {
+    throw new PostNordApiError(`PostNord kunde inte beräkna leveranstid (HTTP ${response.status}). Försök igen senare.`, {
+      status: 502,
+    });
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new PostNordApiError("PostNord returnerade ett ogiltigt leveranssvar.", { cause: error, status: 502 });
+  }
+
+  const warehouseOptions = payload?.warehouseToDeliveryOptions;
+  if (!Array.isArray(warehouseOptions) ||
+      !warehouseOptions.every((warehouse) => Array.isArray(warehouse?.deliveryOptions))) {
+    throw new PostNordApiError("PostNord kunde inte lämna ett giltigt leveransalternativ för valt fraktsätt.", {
+      status: 502,
+    });
+  }
+
+  const options = warehouseOptions.flatMap((warehouse) => warehouse.deliveryOptions);
+  const option = options?.find((candidate) => candidate?.type === deliveryType);
+  const dayRange = option?.defaultOption?.deliveryTime?.dayRange;
+  if (typeof dayRange?.days !== "string" ||
+      !/^\d+(?:-\d+)?$/.test(dayRange.days) ||
+      (dayRange.latest !== undefined && typeof dayRange.latest !== "string")) {
+    throw new PostNordApiError("PostNord kunde inte lämna ett giltigt leveransalternativ för valt fraktsätt.", {
+      status: 502,
+    });
+  }
+
+  return {
+    deliveryType,
+    days: dayRange.days,
+    ...(dayRange.latest ? { latest: dayRange.latest } : {}),
+  };
+}
+
 function normalizeSwedishPostalCode(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();

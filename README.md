@@ -95,7 +95,7 @@ backendens start. I produktens adminformulär kan en JPEG- eller PNG-fil laddas
 upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ. Vid byte
 sparas den nya bilden innan den gamla Storage-filen tas bort.
 
-## Labb 5 – PostNord (steg 1–2: adapter och API-route)
+## Labb 5 – PostNord (steg 1–3: adapter, routes och leveranstid)
 
 Backendens PostNord-adapter hämtar flera närliggande serviceställen med
 `GET /rest/businesslocation/v5/servicepoints/nearest/byaddress` på sandboxen
@@ -126,6 +126,23 @@ node --test backend/test/postNordServicePointRoutes.test.js
 
 Ett manuellt anrop till `http://localhost:3000/api/shipping/service-points?postalCode=12345`
 kräver att backend körs och att PostNord-sandboxen är konfigurerad i `.env`.
+
+Steg 3 hämtar leveransintervall från PostNords Delivery Options API via
+`GET /api/shipping/delivery-estimate?postalCode=41104&deliveryType=home`.
+PostNord rekommenderar Delivery Options för checkout och dess dokumenterade
+svar innehåller `deliveryTime.dayRange.days`; shoppen visar därför intervallet
+som PostNord returnerar, utan att räkna fram ett eget datum. `deliveryType` är
+`home` eller `service-point`. Anropet anger butikens postnummer och aktuell
+handover-tid. För att anropa tjänsten behövs även `POSTNORD_CUSTOMER_KEY` och
+`POSTNORD_ORIGIN_POSTAL_CODE` i backendmiljön.
+
+Dokumentationskälla: [PostNord Customer API Guides – Delivery Options](https://guide.developer.postnord.com/).
+Den innehåller requestformatet för `POST /rest/shipment/v1/deliveryoptions/bywarehouse`,
+leveransalternativen och `deliveryTime.dayRange.days`. Den separata Transit
+Time Calculation-guiden beskriver servicekoder och postnummer, men den publika
+guidesidan visar inget lyckat svarsexempel för dess svarsschema. Delivery
+Options valdes eftersom dess officiella request- och svarsexempel räcker för
+att validera och visa ett intervall korrekt.
 
 ## Kontroller
 
