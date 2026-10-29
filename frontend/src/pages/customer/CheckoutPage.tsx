@@ -30,6 +30,8 @@ export function CheckoutPage() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<CreatedOrder | null>(null);
+  const [step, setStep] = useState<1 | 2>(1);
+  const formRef = useRef<HTMLFormElement>(null);
   const servicePointRequestId = useRef(0);
   const estimateRequestId = useRef(0);
   const quoteItems = useMemo(
@@ -71,6 +73,64 @@ export function CheckoutPage() {
     };
   }, [isCartReady, quoteItems]);
 
+  useEffect(() => {
+    if (step !== 2) return;
+
+    const servicePointId = ++servicePointRequestId.current;
+    const estimateId = ++estimateRequestId.current;
+
+    if (shippingMethod === "service-point") {
+      setIsLoadingServicePoints(true);
+      setServicePointError("");
+      getServicePoints(shippingPostalCode)
+        .then((points) => {
+          if (servicePointId !== servicePointRequestId.current) return;
+          setServicePoints(points);
+          setSelectedServicePoint((selected) =>
+            selected && points.some((point) => point.id === selected.id && point.countryCode === selected.countryCode)
+              ? selected
+              : points[0] ?? null,
+          );
+          if (points.length === 0) setServicePointError("Inga ombud hittades för postnumret.");
+        })
+        .catch((error: Error) => {
+          if (servicePointId === servicePointRequestId.current) {
+            setServicePoints([]);
+            setSelectedServicePoint(null);
+            setServicePointError(error.message || "Ombuden kunde inte hämtas.");
+          }
+        })
+        .finally(() => {
+          if (servicePointId === servicePointRequestId.current) setIsLoadingServicePoints(false);
+        });
+    } else {
+      setServicePoints([]);
+      setSelectedServicePoint(null);
+      setServicePointError("");
+    }
+
+    setIsLoadingEstimate(true);
+    setEstimateError("");
+    setDeliveryEstimate(null);
+    getDeliveryEstimate(shippingPostalCode, shippingCity, shippingMethod)
+      .then((estimate) => {
+        if (estimateId === estimateRequestId.current) setDeliveryEstimate(estimate);
+      })
+      .catch((error: Error) => {
+        if (estimateId === estimateRequestId.current) {
+          setEstimateError(error.message || "Leveranstiden kunde inte hämtas.");
+        }
+      })
+      .finally(() => {
+        if (estimateId === estimateRequestId.current) setIsLoadingEstimate(false);
+      });
+
+    return () => {
+      servicePointRequestId.current += 1;
+      estimateRequestId.current += 1;
+    };
+  }, [shippingCity, shippingMethod, shippingPostalCode, step]);
+
   function handlePostalCodeChange(value: string) {
     servicePointRequestId.current += 1;
     estimateRequestId.current += 1;
@@ -84,56 +144,18 @@ export function CheckoutPage() {
     setEstimateError("");
   }
 
-  async function handleFindServicePoints() {
-    const requestId = ++servicePointRequestId.current;
-    setIsLoadingServicePoints(true);
-    setServicePointError("");
-    setServicePoints([]);
-    setSelectedServicePoint(null);
-
-    try {
-      const points = await getServicePoints(shippingPostalCode);
-      if (requestId !== servicePointRequestId.current) return;
-      setServicePoints(points);
-      if (points.length === 0) setServicePointError("Inga ombud hittades för postnumret.");
-    } catch (error) {
-      if (requestId === servicePointRequestId.current) {
-        setServicePointError(error instanceof Error ? error.message : "Ombuden kunde inte hämtas.");
-      }
-    } finally {
-      if (requestId === servicePointRequestId.current) setIsLoadingServicePoints(false);
-    }
-  }
-
-  async function handleGetDeliveryEstimate() {
-    if (!shippingCity.trim()) {
-      setEstimateError("Ange ort för leveransen först.");
-      return;
-    }
-
-    const requestId = ++estimateRequestId.current;
-    setIsLoadingEstimate(true);
-    setEstimateError("");
-    setDeliveryEstimate(null);
-
-    try {
-      const estimate = await getDeliveryEstimate(
-        shippingPostalCode,
-        shippingCity,
-        shippingMethod === "home" ? "home" : "service-point",
-      );
-      if (requestId === estimateRequestId.current) setDeliveryEstimate(estimate);
-    } catch (error) {
-      if (requestId === estimateRequestId.current) {
-        setEstimateError(error instanceof Error ? error.message : "Leveranstiden kunde inte hämtas.");
-      }
-    } finally {
-      if (requestId === estimateRequestId.current) setIsLoadingEstimate(false);
-    }
+  function handleContinueToDelivery() {
+    if (!formRef.current?.reportValidity()) return;
+    setMessage("");
+    setStep(2);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (step === 1) {
+      handleContinueToDelivery();
+      return;
+    }
     setMessage("");
 
     if (items.length === 0) {
@@ -145,7 +167,7 @@ export function CheckoutPage() {
       return;
     }
     if (shippingMethod === "service-point" && !selectedServicePoint) {
-      setMessage("Hämta och välj ett ombud innan du fortsätter.");
+      setMessage("Välj ett ombud innan du fortsätter.");
       return;
     }
 
@@ -210,7 +232,17 @@ export function CheckoutPage() {
       </div>
 
       <div className="checkout-layout">
-        <form className="form-block checkout-form checkout-panel" onSubmit={handleSubmit}>
+        <form ref={formRef} className="form-block checkout-form checkout-panel" onSubmit={handleSubmit}>
+          <ol className="checkout-progress" aria-label="Kassans steg">
+            <li aria-current={step === 1 ? "step" : undefined} className={step === 1 ? "is-current" : "is-complete"}>
+              <span>1</span> Dina uppgifter
+            </li>
+            <li aria-current={step === 2 ? "step" : undefined} className={step === 2 ? "is-current" : ""}>
+              <span>2</span> Leveransalternativ
+            </li>
+          </ol>
+
+          {step === 1 && <>
           <fieldset disabled={isSubmitting || pendingOrder !== null}>
             <legend>Kundinformation</legend>
             <div className="form-row">
@@ -298,6 +330,19 @@ export function CheckoutPage() {
             </div>
           </fieldset>
 
+          <button type="button" onClick={handleContinueToDelivery}>
+            Vidare till leveransalternativ
+          </button>
+          </>}
+
+          {step === 2 && <>
+          <div className="checkout-address-summary">
+            <span>{customerName} · {shippingAddress}, {shippingPostalCode} {shippingCity}</span>
+            <button type="button" className="secondary-button" onClick={() => setStep(1)}>
+              Ändra uppgifter
+            </button>
+          </div>
+
           <fieldset disabled={isSubmitting || pendingOrder !== null} className="shipping-options">
             <legend>Fraktsätt</legend>
             <div className="shipping-choice-list">
@@ -307,13 +352,7 @@ export function CheckoutPage() {
                   name="shippingMethod"
                   value="service-point"
                   checked={shippingMethod === "service-point"}
-                  onChange={() => {
-                    estimateRequestId.current += 1;
-                    setIsLoadingEstimate(false);
-                    setShippingMethod("service-point");
-                    setDeliveryEstimate(null);
-                    setEstimateError("");
-                  }}
+                  onChange={() => setShippingMethod("service-point")}
                 />
                 <span>
                   <strong>Hämta hos ombud</strong>
@@ -326,13 +365,7 @@ export function CheckoutPage() {
                   name="shippingMethod"
                   value="home"
                   checked={shippingMethod === "home"}
-                  onChange={() => {
-                    estimateRequestId.current += 1;
-                    setIsLoadingEstimate(false);
-                    setShippingMethod("home");
-                    setDeliveryEstimate(null);
-                    setEstimateError("");
-                  }}
+                  onChange={() => setShippingMethod("home")}
                 />
                 <span>
                   <strong>Hemleverans</strong>
@@ -343,9 +376,7 @@ export function CheckoutPage() {
 
             {shippingMethod === "service-point" && (
               <div className="service-point-search">
-                <button type="button" onClick={handleFindServicePoints} disabled={isLoadingServicePoints || shippingPostalCode.trim().length < 5}>
-                  {isLoadingServicePoints ? "Hämtar ombud…" : "Hämta ombud"}
-                </button>
+                {isLoadingServicePoints && <p role="status">Hämtar ombud nära {shippingPostalCode}…</p>}
                 {servicePointError && <p className="form-message" role="alert">{servicePointError}</p>}
                 {servicePoints.length > 0 && (
                   <div className="service-point-list" role="radiogroup" aria-label="Välj ombud">
@@ -369,9 +400,7 @@ export function CheckoutPage() {
             )}
 
             <div className="delivery-estimate">
-              <button type="button" className="secondary-button" onClick={handleGetDeliveryEstimate} disabled={isLoadingEstimate || shippingPostalCode.trim().length < 5}>
-                {isLoadingEstimate ? "Hämtar leveranstid…" : "Beräkna leveranstid"}
-              </button>
+              {isLoadingEstimate && <p role="status">Hämtar beräknad leveranstid…</p>}
               {deliveryEstimate && (
                 <p role="status">
                   Beräknad leverans: {deliveryEstimate.days} {deliveryEstimate.days === "1" ? "dag" : "dagar"}
@@ -384,11 +413,14 @@ export function CheckoutPage() {
 
           <p className="notice">Din order markeras som betald f&ouml;rst n&auml;r betalningen har bekr&auml;ftats.</p>
 
-          <button type="submit" disabled={isSubmitting || isLoadingQuote || !selectedShippingOption}>
-            {isSubmitting ? "\u00d6ppnar betalningen..." : pendingOrder ? "F\u00f6rs\u00f6k igen" : "G\u00e5 till betalning"}
-          </button>
+          <div className="checkout-step-actions">
+            <button type="submit" disabled={isSubmitting || isLoadingQuote || !selectedShippingOption}>
+              {isSubmitting ? "Öppnar betalningen…" : pendingOrder ? "Försök igen" : "Gå till betalning"}
+            </button>
+          </div>
 
           {message && <p className="form-message" role="alert">{message}</p>}
+          </>}
         </form>
 
         <aside className="order-summary">
