@@ -151,13 +151,22 @@ Frakt är 59 kr till ombud och 99 kr hem, med fri frakt vid minst 500 kr i
 varusumma. Det här är förslag i labbtexten, inte tvingande belopp; värdena kan
 ändras med `SHIPPING_SERVICE_POINT_PRICE_SEK`, `SHIPPING_HOME_PRICE_SEK` och
 `SHIPPING_FREE_THRESHOLD_SEK`. Beräkningen använder heltalsören.
-konfigurerbara startvärden, inte som lärarkrav.
 
 Backendtesterna för offertberäkningen körs med:
 
 ```powershell
 node --test backend/test/shippingPricing.test.js backend/test/shippingQuoteRoutes.test.js
 ```
+
+Steg 5 visar fraktsätten i kassan. Ombudsvalet hämtar PostNords serviceställen
+för postnumret och kräver att kunden väljer ett; hemleverans kräver inget ombud.
+Kassan hämtar prisofferten från Express och visar den leveranstid som PostNord
+returnerar. Prisofferten räknas om när varukorgens produkter eller antal ändras.
+
+Kontrollera lokalt genom att starta shoppen, lägga en produkt i varukorgen och
+gå till kassan. Testa båda fraktsätten, sök ombud med ett svenskt postnummer,
+välj ett ombud och hämta leveranstiden. API-nycklarna och butikens PostNord-
+inställningar måste vara ifyllda i backendens `.env`.
 
 ## Kontroller
 

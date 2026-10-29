@@ -1020,6 +1020,71 @@ button:disabled,
   resize: vertical;
 }
 
+.form-block input[type="radio"] {
+  width: 20px;
+  min-height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--color-primary);
+}
+
+.shipping-options {
+  border-top: 1px solid var(--color-border) !important;
+  padding-top: 22px !important;
+}
+
+.shipping-choice-list,
+.service-point-list {
+  display: grid;
+  gap: 12px;
+}
+
+.shipping-choice,
+.service-point-option {
+  display: flex !important;
+  gap: 12px !important;
+  align-items: flex-start;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.shipping-choice > span,
+.service-point-option > span {
+  display: grid;
+  gap: 4px;
+}
+
+.shipping-choice > span > span,
+.service-point-option > span > span {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.service-point-search,
+.delivery-estimate {
+  display: grid;
+  gap: 12px;
+}
+
+.service-point-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.delivery-estimate p {
+  margin: 0;
+}
+
+.secondary-button {
+  justify-self: start;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
