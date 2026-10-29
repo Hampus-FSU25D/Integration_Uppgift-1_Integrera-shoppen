@@ -95,6 +95,24 @@ backendens start. I produktens adminformulär kan en JPEG- eller PNG-fil laddas
 upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ. Vid byte
 sparas den nya bilden innan den gamla Storage-filen tas bort.
 
+## Labb 5 – PostNord (steg 1: serviceställe-adapter)
+
+Backendens PostNord-adapter hämtar flera närliggande serviceställen med
+`GET /rest/businesslocation/v5/servicepoints/nearest/byaddress` på sandboxen
+`https://atapi2.postnord.com`. Den tar ett svenskt postnummer och returnerar
+bara ID, landskod, namn och besöksadress. Nyckeln skickas server-till-server i
+PostNords `apikey`-parameter och lagras i `POSTNORD_API_KEY`; sandboxvärdena
+konfigureras via `.env` eller serverns miljövariabler. Se `.env.example`.
+
+Dokumentationskälla: [PostNord Customer API Guides – Service Points v5](https://guide.developer.postnord.com/).
+Guiden anger sandboxvärd, API-nyckelautentisering och `nearest/byaddress` för
+flera sorterade närliggande serviceställen. Den skiljer detta från
+`bypostalcode`, som returnerar ett standardombud. Guidens exempel på ett
+serviceställesvar visar fälten `servicePointId` och `visitingAddress`; adaptern
+validerar dessa och mappar endast de uppgifter shoppen behöver. PostNord anger
+också att ID måste kombineras med landskod. API-svarsmappningen är verifierad
+mot guideexemplet och mocktester; ett liveanrop mot sandboxen återstår.
+
 ## Kontroller
 
 ```powershell
