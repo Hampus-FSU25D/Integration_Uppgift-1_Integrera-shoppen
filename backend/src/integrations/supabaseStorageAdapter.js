@@ -36,10 +36,10 @@ export async function uploadProductImage(image, { env = process.env, fetchImpl =
     response = await fetchImpl(`${config.storageUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`, {
       method: "POST",
       headers: {
-        apikey: config.serviceRoleKey,
-        Authorization: `Bearer ${config.serviceRoleKey}`,
+        apikey: config.apiKey,
         "Content-Type": image.contentType,
         "x-upsert": "false",
+        ...(config.useLegacyBearer ? { Authorization: `Bearer ${config.apiKey}` } : {}),
       },
       body: image.data,
       signal: AbortSignal.timeout(requestTimeoutMs),
@@ -88,13 +88,14 @@ function validateProductImage(image) {
 
 function getConfig(env) {
   const storageUrl = env.SUPABASE_URL?.replace(/\/+$/, "");
+  const secretKey = env.SUPABASE_SECRET_KEY;
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
   const bucket = env.SUPABASE_STORAGE_BUCKET;
   const publicUrl = env.SUPABASE_PUBLIC_URL?.replace(/\/+$/, "");
 
-  if (!storageUrl || !serviceRoleKey || !bucket || !publicUrl) {
+  if (!storageUrl || (!secretKey && !serviceRoleKey) || !bucket || !publicUrl) {
     throw new SupabaseStorageError(
-      "Supabase Storage är inte konfigurerat. Ange SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_STORAGE_BUCKET och SUPABASE_PUBLIC_URL på backend.",
+      "Supabase Storage är inte konfigurerat. Ange SUPABASE_URL, SUPABASE_SECRET_KEY (eller äldre SUPABASE_SERVICE_ROLE_KEY), SUPABASE_STORAGE_BUCKET och SUPABASE_PUBLIC_URL på backend.",
     );
   }
 
@@ -115,5 +116,5 @@ function getConfig(env) {
     );
   }
 
-  return { storageUrl, serviceRoleKey, bucket, publicUrl };
+  return { storageUrl, apiKey: secretKey || serviceRoleKey, useLegacyBearer: !secretKey, bucket, publicUrl };
 }

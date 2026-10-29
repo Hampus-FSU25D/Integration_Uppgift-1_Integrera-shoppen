@@ -37,6 +37,17 @@ test("uploads to the configured bucket without overwriting and returns the objec
   assert.ok(requests[0].options.signal instanceof AbortSignal);
 });
 
+test("sends a current Supabase Cloud secret key as apikey without treating it as a JWT", async () => {
+  let requestOptions;
+  await uploadProductImage({ data: pngImage(), contentType: "image/png" }, {
+    env: { ...env, SUPABASE_SECRET_KEY: "sb_secret_test-value" },
+    fetchImpl: async (_url, options) => { requestOptions = options; return new Response(null, { status: 200 }); },
+  });
+
+  assert.equal(requestOptions.headers.apikey, "sb_secret_test-value");
+  assert.equal(Object.hasOwn(requestOptions.headers, "Authorization"), false);
+});
+
 test("returns a controlled error for service failures and timeouts", async () => {
   await assert.rejects(
     uploadProductImage({ data: pngImage(), contentType: "image/png" }, {
