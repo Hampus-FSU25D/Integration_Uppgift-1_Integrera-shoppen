@@ -81,9 +81,11 @@ export async function getDeliveryEstimate({ postalCode, deliveryType }, {
   const config = getConfig(env);
   const customerKey = env.POSTNORD_CUSTOMER_KEY;
   const originPostalCode = normalizeSwedishPostalCode(env.POSTNORD_ORIGIN_POSTAL_CODE);
-  if (!customerKey || !originPostalCode) {
+  const originCity = env.POSTNORD_ORIGIN_CITY?.trim();
+  const originStreet = env.POSTNORD_ORIGIN_STREET?.trim();
+  if (!customerKey || !originPostalCode || !originCity || !originStreet) {
     throw new PostNordApiError(
-      "PostNord-leveransberäkning är inte konfigurerad. Ange POSTNORD_CUSTOMER_KEY och POSTNORD_ORIGIN_POSTAL_CODE på backend.",
+      "PostNord-leveransberäkning är inte konfigurerad. Ange kundnyckel och lageradress på backend.",
       { status: 503 },
     );
   }
@@ -98,7 +100,7 @@ export async function getDeliveryEstimate({ postalCode, deliveryType }, {
       body: JSON.stringify({
         warehouses: [{
           id: "shop",
-          address: { postCode: originPostalCode, countryCode: "SE" },
+          address: { street: originStreet, city: originCity, postCode: originPostalCode, countryCode: "SE" },
           orderHandling: { handOverTimer: now().toISOString() },
         }],
         customer: { customerKey },

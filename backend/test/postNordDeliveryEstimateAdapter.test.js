@@ -7,6 +7,8 @@ const env = {
   POSTNORD_API_BASE_URL: "https://atapi2.postnord.com",
   POSTNORD_CUSTOMER_KEY: "shop-test-customer",
   POSTNORD_ORIGIN_POSTAL_CODE: "171 73",
+  POSTNORD_ORIGIN_CITY: "Solna",
+  POSTNORD_ORIGIN_STREET: "Terminalvägen 24",
 };
 
 test("requests PostNord's interval for the selected delivery type", async () => {
@@ -28,7 +30,7 @@ test("requests PostNord's interval for the selected delivery type", async () => 
   assert.deepEqual(request.body, {
     warehouses: [{
       id: "shop",
-      address: { postCode: "17173", countryCode: "SE" },
+      address: { street: "Terminalvägen 24", city: "Solna", postCode: "17173", countryCode: "SE" },
       orderHandling: { handOverTimer: "2026-10-29T09:30:00.000Z" },
     }],
     customer: { customerKey: "shop-test-customer" },
@@ -48,6 +50,10 @@ test("rejects invalid delivery request values and missing PostNord configuration
     (error) => error instanceof PostNordApiError && /fraktsätt/i.test(error.message));
   await assert.rejects(getDeliveryEstimate({ postalCode: "12345", deliveryType: "home" }, {
     env: { ...env, POSTNORD_CUSTOMER_KEY: undefined },
+    fetchImpl: async () => { requested = true; throw new Error("unexpected request"); },
+  }), (error) => error instanceof PostNordApiError && /konfigurer/i.test(error.message));
+  await assert.rejects(getDeliveryEstimate({ postalCode: "12345", deliveryType: "home" }, {
+    env: { ...env, POSTNORD_ORIGIN_STREET: "" },
     fetchImpl: async () => { requested = true; throw new Error("unexpected request"); },
   }), (error) => error instanceof PostNordApiError && /konfigurer/i.test(error.message));
   assert.equal(requested, false);
