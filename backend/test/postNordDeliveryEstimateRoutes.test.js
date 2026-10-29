@@ -6,7 +6,7 @@ import { PostNordApiError } from "../src/integrations/postNordServicePointAdapte
 
 test("returns the estimate for the requested postal code and delivery type", async () => {
   let input;
-  const response = await requestEstimate("?postalCode=41104&deliveryType=home", {
+  const response = await requestEstimate("?postalCode=41104&city=Göteborg&deliveryType=home", {
     async estimate(value) {
       input = value;
       return { deliveryType: "home", days: "2-4", latest: "16:00" };
@@ -15,13 +15,13 @@ test("returns the estimate for the requested postal code and delivery type", asy
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { deliveryType: "home", days: "2-4", latest: "16:00" });
-  assert.deepEqual(input, { postalCode: "41104", deliveryType: "home" });
+  assert.deepEqual(input, { postalCode: "41104", city: "Göteborg", deliveryType: "home" });
 });
 
 test("rejects missing or repeated estimate parameters before calling PostNord", async () => {
   let calls = 0;
   const estimate = async () => { calls += 1; return {}; };
-  for (const query of ["", "?postalCode=41104", "?postalCode=41104&postalCode=17173&deliveryType=home"]) {
+  for (const query of ["", "?postalCode=41104", "?postalCode=41104&deliveryType=home", "?postalCode=41104&city=Göteborg&postalCode=17173&deliveryType=home"]) {
     const response = await requestEstimate(query, { estimate });
     assert.equal(response.status, 400);
     assert.match((await response.json()).error, /leverans/i);
@@ -30,7 +30,7 @@ test("rejects missing or repeated estimate parameters before calling PostNord", 
 });
 
 test("returns controlled PostNord errors", async () => {
-  const response = await requestEstimate("?postalCode=41104&deliveryType=home", {
+  const response = await requestEstimate("?postalCode=41104&city=Göteborg&deliveryType=home", {
     async estimate() { throw new PostNordApiError("PostNord svarade inte i tid.", { status: 502 }); },
   });
 

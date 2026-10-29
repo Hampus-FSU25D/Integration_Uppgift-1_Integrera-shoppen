@@ -38,7 +38,7 @@ export function getServicePoints(postalCode: string) {
   return apiRequest<ServicePoint[]>(`/shipping/service-points?${query}`);
 }
 
-export function getDeliveryEstimate(postalCode: string, deliveryType: ShippingMethod) {
-  const query = new URLSearchParams({ postalCode, deliveryType });
+export function getDeliveryEstimate(postalCode: string, city: string, deliveryType: ShippingMethod) {
+  const query = new URLSearchParams({ postalCode, city, deliveryType });
   return apiRequest<DeliveryEstimate>(`/shipping/delivery-estimate?${query}`);
 }

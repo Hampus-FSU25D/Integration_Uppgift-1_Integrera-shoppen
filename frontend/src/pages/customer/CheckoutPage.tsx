@@ -106,6 +106,11 @@ export function CheckoutPage() {
   }
 
   async function handleGetDeliveryEstimate() {
+    if (!shippingCity.trim()) {
+      setEstimateError("Ange ort för leveransen först.");
+      return;
+    }
+
     const requestId = ++estimateRequestId.current;
     setIsLoadingEstimate(true);
     setEstimateError("");
@@ -114,6 +119,7 @@ export function CheckoutPage() {
     try {
       const estimate = await getDeliveryEstimate(
         shippingPostalCode,
+        shippingCity,
         shippingMethod === "home" ? "home" : "service-point",
       );
       if (requestId === estimateRequestId.current) setDeliveryEstimate(estimate);

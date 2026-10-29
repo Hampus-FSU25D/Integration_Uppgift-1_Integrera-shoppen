@@ -13,7 +13,7 @@ const env = {
 
 test("requests PostNord's interval for the selected delivery type", async () => {
   let request;
-  const estimate = await getDeliveryEstimate({ postalCode: "411 04", deliveryType: "service-point" }, {
+  const estimate = await getDeliveryEstimate({ postalCode: "411 04", city: "Göteborg", deliveryType: "service-point" }, {
     env,
     now: () => new Date("2026-10-29T09:30:00.000Z"),
     fetchImpl: async (url, options) => {
@@ -34,7 +34,7 @@ test("requests PostNord's interval for the selected delivery type", async () => 
       orderHandling: { handOverTimer: "2026-10-29T09:30:00Z" },
     }],
     customer: { customerKey: "shop-test-customer" },
-    recipient: { address: { postCode: "41104", countryCode: "SE" } },
+    recipient: { address: { postCode: "41104", city: "Göteborg", countryCode: "SE" } },
   });
   assert.deepEqual(estimate, { deliveryType: "service-point", days: "1-3", latest: "15:00" });
   assert.equal(JSON.stringify(estimate).includes("sandbox-secret"), false);
@@ -46,13 +46,17 @@ test("rejects invalid delivery request values and missing PostNord configuration
     env,
     fetchImpl: async () => { requested = true; throw new Error("unexpected request"); },
   }), (error) => error instanceof PostNordApiError && /postnummer/i.test(error.message));
+  await assert.rejects(getDeliveryEstimate({ postalCode: "12345", city: "", deliveryType: "home" }, {
+    env,
+    fetchImpl: async () => { requested = true; throw new Error("unexpected request"); },
+  }), (error) => error instanceof PostNordApiError && /ort/i.test(error.message));
   await assert.rejects(getDeliveryEstimate({ postalCode: "12345", deliveryType: "locker" }, { env }),
     (error) => error instanceof PostNordApiError && /fraktsätt/i.test(error.message));
-  await assert.rejects(getDeliveryEstimate({ postalCode: "12345", deliveryType: "home" }, {
+  await assert.rejects(getDeliveryEstimate({ postalCode: "12345", city: "Solna", deliveryType: "home" }, {
     env: { ...env, POSTNORD_CUSTOMER_KEY: undefined },
     fetchImpl: async () => { requested = true; throw new Error("unexpected request"); },
   }), (error) => error instanceof PostNordApiError && /konfigurer/i.test(error.message));
-  await assert.rejects(getDeliveryEstimate({ postalCode: "12345", deliveryType: "home" }, {
+  await assert.rejects(getDeliveryEstimate({ postalCode: "12345", city: "Solna", deliveryType: "home" }, {
     env: { ...env, POSTNORD_ORIGIN_STREET: "" },
     fetchImpl: async () => { requested = true; throw new Error("unexpected request"); },
   }), (error) => error instanceof PostNordApiError && /konfigurer/i.test(error.message));
@@ -66,7 +70,7 @@ test("rejects malformed responses or a missing option for the requested method",
     { warehouseToDeliveryOptions: [{ deliveryOptions: [] }] },
     { warehouseToDeliveryOptions: [{ deliveryOptions: [{ type: "service-point", defaultOption: {} }] }] },
   ]) {
-    await assert.rejects(getDeliveryEstimate({ postalCode: "41104", deliveryType: "service-point" }, {
+    await assert.rejects(getDeliveryEstimate({ postalCode: "41104", city: "Göteborg", deliveryType: "service-point" }, {
       env,
       fetchImpl: async () => Response.json(payload),
     }), (error) => error instanceof PostNordApiError && /leveransalternativ/i.test(error.message));
@@ -74,13 +78,13 @@ test("rejects malformed responses or a missing option for the requested method",
 });
 
 test("returns controlled errors for PostNord failures and timeouts", async () => {
-  await assert.rejects(getDeliveryEstimate({ postalCode: "41104", deliveryType: "home" }, {
+  await assert.rejects(getDeliveryEstimate({ postalCode: "41104", city: "Göteborg", deliveryType: "home" }, {
     env,
     fetchImpl: async () => Response.json({ message: "Invalid address for sandbox-secret at 17173" }, { status: 400 }),
   }), (error) => error instanceof PostNordApiError && /400/.test(error.message) &&
     error.providerMessage === "Invalid address for [redacted] at [redacted]");
 
-  await assert.rejects(getDeliveryEstimate({ postalCode: "41104", deliveryType: "home" }, {
+  await assert.rejects(getDeliveryEstimate({ postalCode: "41104", city: "Göteborg", deliveryType: "home" }, {
     env,
     fetchImpl: async () => { throw Object.assign(new Error("timeout"), { name: "TimeoutError" }); },
   }), (error) => error instanceof PostNordApiError && /svarade inte i tid/i.test(error.message));

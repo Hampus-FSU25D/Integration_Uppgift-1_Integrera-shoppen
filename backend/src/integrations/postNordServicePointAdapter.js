@@ -66,7 +66,7 @@ export async function getNearbyServicePoints(postalCode, { env = process.env, fe
   return points.map(mapServicePoint);
 }
 
-export async function getDeliveryEstimate({ postalCode, deliveryType }, {
+export async function getDeliveryEstimate({ postalCode, city, deliveryType }, {
   env = process.env,
   fetchImpl = fetch,
   now = () => new Date(),
@@ -77,6 +77,9 @@ export async function getDeliveryEstimate({ postalCode, deliveryType }, {
   }
   if (deliveryType !== "home" && deliveryType !== "service-point") {
     throw new PostNordApiError("Välj ett giltigt fraktsätt.", { status: 400 });
+  }
+  if (typeof city !== "string" || !city.trim()) {
+    throw new PostNordApiError("Ange ort för leveransen.", { status: 400 });
   }
 
   const config = getConfig(env);
@@ -105,7 +108,7 @@ export async function getDeliveryEstimate({ postalCode, deliveryType }, {
           orderHandling: { handOverTimer: now().toISOString().replace(/\.\d{3}Z$/, "Z") },
         }],
         customer: { customerKey },
-        recipient: { address: { postCode: destinationPostalCode, countryCode: "SE" } },
+        recipient: { address: { postCode: destinationPostalCode, city: city.trim(), countryCode: "SE" } },
       }),
       signal: AbortSignal.timeout(requestTimeoutMs),
     });
