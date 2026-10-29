@@ -76,8 +76,9 @@ test("rejects malformed responses or a missing option for the requested method",
 test("returns controlled errors for PostNord failures and timeouts", async () => {
   await assert.rejects(getDeliveryEstimate({ postalCode: "41104", deliveryType: "home" }, {
     env,
-    fetchImpl: async () => new Response(null, { status: 503 }),
-  }), (error) => error instanceof PostNordApiError && /503/.test(error.message));
+    fetchImpl: async () => Response.json({ message: "Invalid address for sandbox-secret at 17173" }, { status: 400 }),
+  }), (error) => error instanceof PostNordApiError && /400/.test(error.message) &&
+    error.providerMessage === "Invalid address for [redacted] at [redacted]");
 
   await assert.rejects(getDeliveryEstimate({ postalCode: "41104", deliveryType: "home" }, {
     env,

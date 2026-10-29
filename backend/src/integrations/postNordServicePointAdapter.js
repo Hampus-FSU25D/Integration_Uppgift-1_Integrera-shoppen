@@ -6,6 +6,7 @@ export class PostNordApiError extends Error {
     super(message, options);
     this.name = "PostNordApiError";
     this.status = options.status;
+    this.providerMessage = options.providerMessage;
   }
 }
 
@@ -116,8 +117,16 @@ export async function getDeliveryEstimate({ postalCode, deliveryType }, {
   }
 
   if (!response.ok) {
+    const providerMessage = await readProviderErrorMessage(response, [
+      config.apiKey,
+      customerKey,
+      originStreet,
+      originPostalCode,
+      destinationPostalCode,
+    ]);
     throw new PostNordApiError(`PostNord kunde inte beräkna leveranstid (HTTP ${response.status}). Försök igen senare.`, {
       status: 502,
+      providerMessage,
     });
   }
 
@@ -182,6 +191,27 @@ function getConfig(env) {
   }
 
   return { apiKey, baseUrl };
+}
+
+async function readProviderErrorMessage(response, sensitiveValues) {
+  try {
+    const payload = await response.json();
+    const message = [
+      payload?.message,
+      payload?.errorMessage,
+      payload?.error_description,
+      payload?.error?.message,
+      ...(Array.isArray(payload?.errors) ? payload.errors.map((error) => error?.message) : []),
+    ].find((value) => typeof value === "string" && value.trim());
+    if (!message) return undefined;
+
+    return sensitiveValues.reduce(
+      (safeMessage, value) => value ? safeMessage.replaceAll(value, "[redacted]") : safeMessage,
+      message.trim().slice(0, 300),
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 function isServicePoint(point) {

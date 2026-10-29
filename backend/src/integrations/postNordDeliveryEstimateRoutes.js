@@ -14,7 +14,7 @@ export function createPostNordDeliveryEstimateRouter({ estimate = getDeliveryEst
       return response.json(await estimate({ postalCode, deliveryType }));
     } catch (error) {
       if (error instanceof PostNordApiError) {
-        console.warn("PostNord delivery estimate failed:", error.message);
+        console.warn("PostNord delivery estimate failed:", error.message, error.providerMessage ?? "");
         return response.status(error.status ?? 502).json({ error: error.message });
       }
       return next(error);
