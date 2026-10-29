@@ -69,7 +69,6 @@ export async function getNearbyServicePoints(postalCode, { env = process.env, fe
 export async function getDeliveryEstimate({ postalCode, city, deliveryType }, {
   env = process.env,
   fetchImpl = fetch,
-  now = () => new Date(),
 } = {}) {
   const destinationPostalCode = normalizeSwedishPostalCode(postalCode);
   if (!destinationPostalCode) {
@@ -100,12 +99,12 @@ export async function getDeliveryEstimate({ postalCode, city, deliveryType }, {
   try {
     response = await fetchImpl(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: { "Accept-Language": "en", "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
         warehouses: [{
           id: "shop",
           address: { street: originStreet, city: originCity, postCode: originPostalCode, countryCode: "SE" },
-          orderHandling: { handOverTimer: now().toISOString().replace(/\.\d{3}Z$/, "Z") },
+          orderHandling: { daysUntilOrderIsReady: "0-2" },
         }],
         customer: { customerKey },
         recipient: { address: { postCode: destinationPostalCode, city: city.trim(), countryCode: "SE" } },

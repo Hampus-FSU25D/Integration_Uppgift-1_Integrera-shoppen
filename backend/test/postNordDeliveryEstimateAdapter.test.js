@@ -15,7 +15,6 @@ test("requests PostNord's interval for the selected delivery type", async () => 
   let request;
   const estimate = await getDeliveryEstimate({ postalCode: "411 04", city: "Göteborg", deliveryType: "service-point" }, {
     env,
-    now: () => new Date("2026-10-29T09:30:00.000Z"),
     fetchImpl: async (url, options) => {
       request = { url: new URL(url), options, body: JSON.parse(options.body) };
       return Response.json(deliveryOptions);
@@ -26,12 +25,13 @@ test("requests PostNord's interval for the selected delivery type", async () => 
   assert.equal(request.url.pathname, "/rest/shipment/v1/deliveryoptions/bywarehouse");
   assert.deepEqual(Object.fromEntries(request.url.searchParams), { apikey: "sandbox-secret" });
   assert.equal(request.options.method, "POST");
+  assert.equal(request.options.headers["Accept-Language"], "en");
   assert.ok(request.options.signal instanceof AbortSignal);
   assert.deepEqual(request.body, {
     warehouses: [{
       id: "shop",
       address: { street: "Terminalvägen 24", city: "Solna", postCode: "17173", countryCode: "SE" },
-      orderHandling: { handOverTimer: "2026-10-29T09:30:00Z" },
+      orderHandling: { daysUntilOrderIsReady: "0-2" },
     }],
     customer: { customerKey: "shop-test-customer" },
     recipient: { address: { postCode: "41104", city: "Göteborg", countryCode: "SE" } },
