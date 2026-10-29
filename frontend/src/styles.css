@@ -1591,6 +1591,10 @@ button:disabled,
     aspect-ratio: 16 / 11;
   }
 
+  .product-card-no-image .product-card-image {
+    display: none;
+  }
+
   .product-media-panel {
     min-height: 320px;
   }

@@ -76,7 +76,7 @@ export function OrderConfirmationPage({ path }: PageProps) {
   if (loadState === "loading") {
     return (
       <section className="placeholder auth-panel">
-        <h1>Orderbekraftelse</h1>
+        <h1>Orderbekräftelse</h1>
         <p>Laddar order.</p>
       </section>
     );
@@ -85,7 +85,7 @@ export function OrderConfirmationPage({ path }: PageProps) {
   if (loadState === "error") {
     return (
       <section className="placeholder auth-panel">
-        <h1>Orderbekraftelse</h1>
+        <h1>Orderbekräftelse</h1>
         <p>Ordern skapades, men bekräftelsen kunde inte hämtas.</p>
         <p>Ordernummer: {orderId}</p>
         <p>

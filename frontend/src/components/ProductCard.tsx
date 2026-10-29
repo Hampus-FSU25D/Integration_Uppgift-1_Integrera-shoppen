@@ -15,7 +15,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const stockClass = product.stock <= 0 ? "out" : product.stock <= 3 ? "low" : "";
 
   return (
-    <article className="product-card">
+    <article className={`product-card${product.imageUrl ? "" : " product-card-no-image"}`}>
       <Link href={`/products/${product.id}`} className="product-card-image" aria-label={`Visa ${product.name}`}>
         {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>Ingen bild</span>}
       </Link>
