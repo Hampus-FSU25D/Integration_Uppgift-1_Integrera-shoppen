@@ -13,6 +13,7 @@ import { syncProductsToSearch } from "./integrations/productSearchSync.js";
 import { parseSearchParams, SearchParameterError } from "./integrations/searchParams.js";
 import { createGuestPaymentCredential, createOrderPaymentRouter } from "./integrations/orderPaymentRoutes.js";
 import { createStripeWebhookRouter } from "./integrations/stripeWebhookRoutes.js";
+import { createAdminProductImageRouter } from "./integrations/adminProductImageRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -57,6 +58,7 @@ app.use(
     },
   }),
 );
+app.use("/api/admin/product-images", createAdminProductImageRouter({ requireAdmin }));
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 
 app.get("/api/health", async (_request, response) => {

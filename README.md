@@ -87,7 +87,8 @@ Adminlistan visar ett kort prefix och orderdetaljsidan visar hela numret.
 Serverns Supabase Storage-adapter accepterar JPEG- och PNG-innehåll som matchar
 filens format. Maxstorleken är 5 MiB (5 242 880 byte); större filer avvisas
 innan något skickas till Storage. Den inkommande uppladdningsrouten får samma
-gräns när den läggs till i ett senare steg.
+gräns. Administratörer kan skicka en fil i multipart-fältet `image` till
+`POST /api/admin/product-images` med headern `X-Requested-With: XMLHttpRequest`.
 
 ## Kontroller
 
