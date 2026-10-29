@@ -8,7 +8,7 @@ import type { DeliveryEstimate, ServicePoint, ShippingMethod, ShippingQuote } fr
 import { formatPrice } from "../../utils/format";
 
 export function CheckoutPage() {
-  const { items } = useCart();
+  const { items, isReady: isCartReady } = useCart();
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -40,6 +40,15 @@ export function CheckoutPage() {
 
   useEffect(() => {
     let active = true;
+    if (!isCartReady || quoteItems.length === 0) {
+      setShippingQuote(null);
+      setQuoteError("");
+      setIsLoadingQuote(false);
+      return () => {
+        active = false;
+      };
+    }
+
     setIsLoadingQuote(true);
     setQuoteError("");
 
@@ -60,7 +69,7 @@ export function CheckoutPage() {
     return () => {
       active = false;
     };
-  }, [quoteItems]);
+  }, [isCartReady, quoteItems]);
 
   function handlePostalCodeChange(value: string) {
     servicePointRequestId.current += 1;
