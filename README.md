@@ -95,7 +95,7 @@ backendens start. I produktens adminformulär kan en JPEG- eller PNG-fil laddas
 upp när produkten har sparats; fältet Bild-URL finns kvar som alternativ. Vid byte
 sparas den nya bilden innan den gamla Storage-filen tas bort.
 
-## Labb 5 – PostNord (steg 1: serviceställe-adapter)
+## Labb 5 – PostNord (steg 1–2: adapter och API-route)
 
 Backendens PostNord-adapter hämtar flera närliggande serviceställen med
 `GET /rest/businesslocation/v5/servicepoints/nearest/byaddress` på sandboxen
@@ -112,6 +112,20 @@ serviceställesvar visar fälten `servicePointId` och `visitingAddress`; adapter
 validerar dessa och mappar endast de uppgifter shoppen behöver. PostNord anger
 också att ID måste kombineras med landskod. API-svarsmappningen är verifierad
 mot guideexemplet och mocktester; ett liveanrop mot sandboxen återstår.
+
+Steg 2 exponerar sökningen genom `GET
+/api/shipping/service-points?postalCode=12345`. Routens Express-handler avvisar
+saknat eller dubblerat postnummer, anropar adaptern och returnerar dess
+begränsade serviceställeformat. Providerfel blir kontrollerade HTTP-fel.
+Express-testerna använder en mockad adapter och kräver varken en startad server
+eller PostNord-nyckel:
+
+```powershell
+node --test backend/test/postNordServicePointRoutes.test.js
+```
+
+Ett manuellt anrop till `http://localhost:3000/api/shipping/service-points?postalCode=12345`
+kräver att backend körs och att PostNord-sandboxen är konfigurerad i `.env`.
 
 ## Kontroller
 

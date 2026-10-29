@@ -14,6 +14,7 @@ import { parseSearchParams, SearchParameterError } from "./integrations/searchPa
 import { createGuestPaymentCredential, createOrderPaymentRouter } from "./integrations/orderPaymentRoutes.js";
 import { createStripeWebhookRouter } from "./integrations/stripeWebhookRoutes.js";
 import { createAdminProductImageRouter } from "./integrations/adminProductImageRoutes.js";
+import { createPostNordServicePointRouter } from "./integrations/postNordServicePointRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -60,6 +61,7 @@ app.use(
 );
 app.use("/api/admin/products", createAdminProductImageRouter({ requireAdmin, database: pool }));
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
+app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 
 app.get("/api/health", async (_request, response) => {
   try {
