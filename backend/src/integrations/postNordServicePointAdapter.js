@@ -102,7 +102,7 @@ export async function getDeliveryEstimate({ postalCode, deliveryType }, {
         warehouses: [{
           id: "shop",
           address: { street: originStreet, city: originCity, postCode: originPostalCode, countryCode: "SE" },
-          orderHandling: { handOverTimer: now().toISOString() },
+          orderHandling: { handOverTimer: now().toISOString().replace(/\.\d{3}Z$/, "Z") },
         }],
         customer: { customerKey },
         recipient: { address: { postCode: destinationPostalCode, countryCode: "SE" } },

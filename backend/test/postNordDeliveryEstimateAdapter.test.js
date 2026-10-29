@@ -31,7 +31,7 @@ test("requests PostNord's interval for the selected delivery type", async () => 
     warehouses: [{
       id: "shop",
       address: { street: "Terminalvägen 24", city: "Solna", postCode: "17173", countryCode: "SE" },
-      orderHandling: { handOverTimer: "2026-10-29T09:30:00.000Z" },
+      orderHandling: { handOverTimer: "2026-10-29T09:30:00Z" },
     }],
     customer: { customerKey: "shop-test-customer" },
     recipient: { address: { postCode: "41104", countryCode: "SE" } },
