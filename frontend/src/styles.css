@@ -1464,6 +1464,26 @@ button:disabled,
   margin: 40px auto;
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0;
+  color: var(--color-muted);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+  content: "";
+}
+
+.google-login-button {
+  width: 100%;
+}
+
 @media (max-width: 1024px) {
   .site-header-main {
     grid-template-columns: 1fr auto;

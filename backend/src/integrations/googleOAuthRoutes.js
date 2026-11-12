@@ -79,6 +79,7 @@ function matchesState(expected, actual) {
 
 function loginResult(frontendUrl, result) {
   const url = new URL(frontendUrl);
+  url.pathname = result === "success" ? "/" : "/login";
   url.searchParams.set("google_login", result);
   return url.toString();
 }

@@ -21,7 +21,12 @@ export function LoginPage() {
   const { signIn, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const googleLoginResult = new URLSearchParams(window.location.search).get("google_login");
+  const [message, setMessage] = useState(() => {
+    if (googleLoginResult === "cancelled") return "Google-inloggningen avbröts. Du kan försöka igen.";
+    if (googleLoginResult === "failed") return "Google-inloggningen kunde inte slutföras. Försök igen.";
+    return "";
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -83,7 +88,16 @@ export function LoginPage() {
         </button>
       </form>
 
-      {message && <p className="form-message">{message}</p>}
+      <div className="auth-divider"><span>eller</span></div>
+      <button
+        type="button"
+        className="button secondary-action google-login-button"
+        onClick={() => window.location.assign("/api/auth/google")}
+      >
+        Fortsätt med Google
+      </button>
+
+      {message && <p className="form-message" role="alert">{message}</p>}
 
       <p>
         <Link href="/register">Registrera kundkonto</Link>
