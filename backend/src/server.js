@@ -17,6 +17,8 @@ import { createAdminProductImageRouter } from "./integrations/adminProductImageR
 import { createPostNordServicePointRouter } from "./integrations/postNordServicePointRoutes.js";
 import { createPostNordDeliveryEstimateRouter } from "./integrations/postNordDeliveryEstimateRoutes.js";
 import { createShippingQuoteRouter } from "./integrations/shippingQuoteRoutes.js";
+import { createGoogleOAuthAdapter } from "./integrations/googleOAuthAdapter.js";
+import { createGoogleOAuthRouter } from "./integrations/googleOAuthRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -72,6 +74,12 @@ app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 app.use("/api/shipping/delivery-estimate", createPostNordDeliveryEstimateRouter());
 app.use("/api/shipping/quote", createShippingQuoteRouter({ database: pool }));
 app.use("/api/search", createSearchRouter());
+app.use("/api/auth/google", createGoogleOAuthRouter({
+  adapter: createGoogleOAuthAdapter(),
+  database: pool,
+  startSession: startUserSession,
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+}));
 
 app.get("/api/health", async (_request, response) => {
   try {
