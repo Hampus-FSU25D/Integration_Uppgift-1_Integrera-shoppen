@@ -86,8 +86,7 @@ function readConfig(env) {
     throw new GoogleOAuthError("Google-inloggning är inte korrekt konfigurerad.", { status: 503 });
   }
 
-  const isLocalHttp = env.NODE_ENV !== "production" && callback.protocol === "http:" &&
-    ["localhost", "127.0.0.1"].includes(callback.hostname);
+  const isLocalHttp = callback.protocol === "http:" && ["localhost", "127.0.0.1"].includes(callback.hostname);
   if ((!isLocalHttp && callback.protocol !== "https:") || callback.pathname !== "/api/auth/google/callback" ||
       callback.search || callback.hash || callback.username || callback.password) {
     throw new GoogleOAuthError("Google-inloggning är inte korrekt konfigurerad.", { status: 503 });

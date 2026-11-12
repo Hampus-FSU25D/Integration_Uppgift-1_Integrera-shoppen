@@ -124,7 +124,7 @@ app.post("/api/auth/login", async (request, response, next) => {
 
     const result = await pool.query("select id, email, role, password_hash from users where email = $1", [email]);
     const user = result.rows[0];
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
+    if (!user?.password_hash || !(await verifyPassword(password, user.password_hash))) {
       return response.status(401).json({ error: "Login failed. Check your email and password." });
     }
 

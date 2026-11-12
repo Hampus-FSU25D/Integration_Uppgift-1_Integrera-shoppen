@@ -60,11 +60,11 @@ function checkoutBody(overrides = {}) {
   };
 }
 
-async function createOrder(body, dependencies) {
+async function createOrder(body, dependencies, userId = null) {
   const app = express();
   app.use(express.json());
   app.use((request, _response, next) => {
-    request.session = { userId: null };
+    request.session = { userId };
     next();
   });
   app.use("/api/orders", createOrderCheckoutRouter({
@@ -87,6 +87,15 @@ async function createOrder(body, dependencies) {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 }
+
+test("associates a checkout order with the authenticated customer session", async () => {
+  const dependencies = createDependencies();
+  const response = await createOrder(checkoutBody(), dependencies, "customer-123");
+
+  assert.equal(response.status, 201);
+  const insert = dependencies.calls.find(({ sql }) => sql.includes("insert into orders"));
+  assert.equal(insert.values[0], "customer-123");
+});
 
 test("persists selected service point and calculates order total from database prices", async () => {
   const dependencies = createDependencies();

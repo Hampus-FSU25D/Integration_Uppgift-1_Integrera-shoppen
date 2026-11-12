@@ -27,6 +27,18 @@ test("builds a Google authorization URL with only identity scopes and the suppli
   assert.equal(authorizeUrl.searchParams.has("access_type"), false);
 });
 
+test("allows the local HTTP callback during container-based local runs", () => {
+  const adapter = createGoogleOAuthAdapter({ env: { ...env, NODE_ENV: "production" } });
+  assert.equal(new URL(adapter.createAuthorizationUrl("a".repeat(64))).searchParams.get("redirect_uri"), redirectUri);
+});
+
+test("requires HTTPS for non-local callbacks in production", () => {
+  const adapter = createGoogleOAuthAdapter({
+    env: { ...env, NODE_ENV: "production", GOOGLE_REDIRECT_URI: "http://shop.example.com/api/auth/google/callback" },
+  });
+  assert.throws(() => adapter.createAuthorizationUrl("a".repeat(64)), GoogleOAuthError);
+});
+
 test("exchanges the code and returns only verified identity claims", async () => {
   const idToken = signIdToken({
     iss: "https://accounts.google.com",
