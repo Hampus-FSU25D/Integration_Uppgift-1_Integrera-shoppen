@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { LogIn, LogOut, ShieldCheck, Search, ShoppingCart } from "lucide-react";
+import { LogIn, LogOut, ShieldCheck, Search, ShoppingCart, UserRound } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { useCart } from "../../cart/CartContext";
 import { Link } from "../../components/Link";
@@ -107,10 +107,16 @@ export function CustomerHeader() {
               </div>
 
               {user ? (
-                <button type="button" className="profile-menu-item" onClick={() => void signOut()}>
-                  <LogOut size={18} strokeWidth={2.4} aria-hidden="true" />
-                  Logga ut
-                </button>
+                <>
+                  <Link href="/account/orders" className="profile-menu-item">
+                    <UserRound size={18} strokeWidth={2.4} aria-hidden="true" />
+                    Mina sidor
+                  </Link>
+                  <button type="button" className="profile-menu-item" onClick={() => void signOut()}>
+                    <LogOut size={18} strokeWidth={2.4} aria-hidden="true" />
+                    Logga ut
+                  </button>
+                </>
               ) : (
                 <Link href={getLoginPath()} className="profile-menu-item">
                   <LogIn size={18} strokeWidth={2.4} aria-hidden="true" />

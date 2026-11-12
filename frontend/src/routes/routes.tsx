@@ -7,6 +7,7 @@ import { AdminProductNewPage } from "../pages/admin/AdminProductNewPage";
 import { AdminProductsPage } from "../pages/admin/AdminProductsPage";
 import { CartPage } from "../pages/customer/CartPage";
 import { CheckoutPage } from "../pages/customer/CheckoutPage";
+import { CustomerOrdersPage } from "../pages/customer/CustomerOrdersPage";
 import { LoginPage } from "../pages/customer/LoginPage";
 import { OrderConfirmationPage } from "../pages/customer/OrderConfirmationPage";
 import { ProductDetailsPage } from "../pages/customer/ProductDetailsPage";
@@ -73,6 +74,12 @@ export const routes: RouteDefinition[] = [
     label: "Registrera",
     match: exact("/register"),
     component: RegisterPage,
+  },
+  {
+    path: "/account/orders",
+    label: "Mina sidor",
+    match: exact("/account/orders"),
+    component: CustomerOrdersPage,
   },
   {
     path: "/admin",

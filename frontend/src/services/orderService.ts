@@ -26,7 +26,14 @@ export type CreatedOrder = {
   status?: OrderStatus;
 };
 export type CheckoutSession = { id: string; url: string };
-export type OrderStatus = "pending" | "confirmed" | "processing" | "delivered" | "cancelled" | "refunded";
+export type OrderStatus = "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
+export type CustomerOrder = {
+  id: string;
+  totalPrice: number;
+  status: OrderStatus;
+  createdAt: string;
+  items: Array<{ productName: string; quantity: number; priceAtPurchase: number }>;
+};
 export type AdminOrderListItem = {
   id: string;
   customerName: string;
@@ -64,6 +71,7 @@ export const orderStatusOptions: Array<{ value: OrderStatus; label: string }> = 
   { value: "pending", label: "Beställd" },
   { value: "confirmed", label: "Betald" },
   { value: "processing", label: "Behandlas" },
+  { value: "shipped", label: "Skickad" },
   { value: "delivered", label: "Levererad" },
   { value: "cancelled", label: "Avbruten" },
   { value: "refunded", label: "Återbetald" },
@@ -105,6 +113,10 @@ export function getRememberedOrderSummary(orderId: string): CreatedOrder | null 
 
 export function getAdminOrders() {
   return apiRequest<AdminOrderListItem[]>("/admin/orders");
+}
+
+export function getMyOrders() {
+  return apiRequest<CustomerOrder[]>("/orders/mine");
 }
 
 export function getAdminOrderById(orderId: string) {

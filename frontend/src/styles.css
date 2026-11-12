@@ -1464,6 +1464,54 @@ button:disabled,
   margin: 40px auto;
 }
 
+.customer-orders-page {
+  display: grid;
+  gap: 22px;
+}
+
+.customer-order-list {
+  display: grid;
+  gap: 16px;
+}
+
+.customer-order-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: 22px;
+}
+
+.customer-order-heading,
+.customer-order-heading > div,
+.customer-order-card li,
+.customer-order-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.customer-order-heading > div {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.customer-order-heading time {
+  color: var(--color-muted);
+}
+
+.customer-order-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 18px 0;
+  border-block: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.customer-order-total {
+  margin: 0;
+}
+
 .auth-divider {
   display: flex;
   align-items: center;

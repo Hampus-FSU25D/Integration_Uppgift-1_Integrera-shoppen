@@ -19,6 +19,7 @@ import { createPostNordDeliveryEstimateRouter } from "./integrations/postNordDel
 import { createShippingQuoteRouter } from "./integrations/shippingQuoteRoutes.js";
 import { createGoogleOAuthAdapter } from "./integrations/googleOAuthAdapter.js";
 import { createGoogleOAuthRouter } from "./integrations/googleOAuthRoutes.js";
+import { createOrderHistoryRouter } from "./integrations/orderHistoryRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -69,6 +70,7 @@ app.use("/api/admin/products", createAdminProductImageRouter({
   syncProduct: async (id) => syncProductsToSearch(await selectProducts("where p.id = $1", [id])),
 }));
 app.use("/api/orders", createOrderCheckoutRouter({ database: pool }));
+app.use("/api/orders", createOrderHistoryRouter({ database: pool }));
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 app.use("/api/shipping/delivery-estimate", createPostNordDeliveryEstimateRouter());
