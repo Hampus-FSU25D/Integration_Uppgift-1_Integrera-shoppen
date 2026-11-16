@@ -186,12 +186,16 @@ app.get("/api/auth/me", async (request, response, next) => {
       );
       const admin = result.rows[0] ?? null;
       if (!admin) request.session.destroy(() => {});
+      const customer = admin && request.session.userId
+        ? await pool.query("select id from users where id = $1", [request.session.userId])
+        : null;
       return response.json({
         user: admin ? {
           id: `github:${admin.github_id}`,
           email: null,
           name: admin.name ?? admin.login,
           role: "admin",
+          cartUserId: customer?.rows[0]?.id ?? null,
         } : null,
       });
     }
@@ -478,14 +482,16 @@ async function startUserSession(request, user) {
 }
 
 async function startGitHubAdminSession(request, admin) {
+  const customerUserId = request.session.userId;
   await new Promise((resolve, reject) => request.session.regenerate((error) => error ? reject(error) : resolve()));
   request.session.githubAdminId = admin.id;
   request.session.githubAdminLogin = admin.login;
+  if (customerUserId) request.session.userId = customerUserId;
   await new Promise((resolve, reject) => request.session.save((error) => error ? reject(error) : resolve()));
 }
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, name: user.name ?? null, role: user.role };
+  return { id: user.id, email: user.email, name: user.name ?? null, role: user.role, cartUserId: user.id };
 }
 
 function normalizeEmail(email) {

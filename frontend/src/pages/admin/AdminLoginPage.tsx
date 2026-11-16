@@ -35,7 +35,7 @@ export function AdminLoginPage() {
       </button>
       {message && <p className="form-message" role="alert">{message}</p>}
       {user && user.role !== "admin" && (
-        <p className="form-message" role="status">Du är inloggad som kund. GitHub-inloggningen startar en separat administratörssession.</p>
+        <p className="form-message" role="status">Du är inloggad som kund. Om du fortsätter med GitHub kan du behålla kundens varukorg och orderhistorik.</p>
       )}
       <p><Link href="/login">Till kundinloggningen</Link></p>
     </section>

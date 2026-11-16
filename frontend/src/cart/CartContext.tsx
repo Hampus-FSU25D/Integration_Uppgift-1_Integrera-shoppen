@@ -36,18 +36,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const hasLoadedDatabaseCart = useRef(false);
+  const cartUserId = user?.cartUserId ?? (user?.role === "customer" ? user.id : null);
 
   useEffect(() => {
     if (status !== "ready") {
       return;
     }
 
-    if (user) {
+    if (cartUserId) {
       return;
     }
 
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-  }, [items, status, user]);
+  }, [cartUserId, items, status]);
 
   useEffect(() => {
     let active = true;
@@ -57,7 +58,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!user) {
+      if (!cartUserId) {
         hasLoadedDatabaseCart.current = false;
         setItems(readStoredCart());
         setIsReady(true);
@@ -68,7 +69,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setIsSyncing(true);
 
       try {
-        const databaseItems = await getCartItems();
+        const databaseItems = await getCartItems(cartUserId);
         const localItems = readStoredCart();
         const mergedItems = mergeCartItems(databaseItems, localItems);
 
@@ -80,7 +81,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         hasLoadedDatabaseCart.current = true;
 
         if (localItems.length > 0) {
-          await replaceCartItems(user.id, mergedItems);
+          await replaceCartItems(cartUserId, mergedItems);
           window.localStorage.removeItem(CART_STORAGE_KEY);
         }
       } finally {
@@ -96,15 +97,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [status, user]);
+  }, [cartUserId, status]);
 
   useEffect(() => {
-    if (!user || !hasLoadedDatabaseCart.current) {
+    if (!cartUserId || !hasLoadedDatabaseCart.current) {
       return;
     }
 
     let active = true;
-    const activeUserId = user.id;
+    const activeUserId = cartUserId;
 
     async function saveDatabaseCart() {
       setIsSyncing(true);
@@ -123,7 +124,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [items, user]);
+  }, [cartUserId, items]);
 
   const value = useMemo<CartContextValue>(() => {
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);

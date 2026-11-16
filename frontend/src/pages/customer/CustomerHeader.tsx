@@ -115,7 +115,7 @@ export function CustomerHeader() {
 
               {user ? (
                 <>
-                  {user.role === "customer" && (
+                  {(user.role === "customer" || user.cartUserId) && (
                     <Link href="/account/orders" className="profile-menu-item">
                       <UserRound size={18} strokeWidth={2.4} aria-hidden="true" />
                       Mina sidor
