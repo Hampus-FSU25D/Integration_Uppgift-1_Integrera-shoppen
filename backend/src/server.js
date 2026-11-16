@@ -17,6 +17,14 @@ import { createAdminProductImageRouter } from "./integrations/adminProductImageR
 import { createPostNordServicePointRouter } from "./integrations/postNordServicePointRoutes.js";
 import { createPostNordDeliveryEstimateRouter } from "./integrations/postNordDeliveryEstimateRoutes.js";
 import { createShippingQuoteRouter } from "./integrations/shippingQuoteRoutes.js";
+import { createGoogleOAuthAdapter } from "./integrations/googleOAuthAdapter.js";
+import { createGoogleOAuthRouter } from "./integrations/googleOAuthRoutes.js";
+import { createGitHubOAuthAdapter } from "./integrations/githubOAuthAdapter.js";
+import { createGitHubOAuthRouter } from "./integrations/githubOAuthRoutes.js";
+import { createGitHubIssuesAdapter } from "./integrations/githubIssuesAdapter.js";
+import { createGitHubIssuesRouter } from "./integrations/githubIssuesRoutes.js";
+import { GoogleAccountLinkError, linkPendingGoogleIdentity } from "./integrations/googleAccountLink.js";
+import { createOrderHistoryRouter } from "./integrations/orderHistoryRoutes.js";
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -61,17 +69,38 @@ app.use(
     },
   }),
 );
+app.use("/api/auth", (_request, response, next) => {
+  response.set("Cache-Control", "no-store");
+  next();
+});
 app.use("/api/admin/products", createAdminProductImageRouter({
   requireAdmin,
   database: pool,
   syncProduct: async (id) => syncProductsToSearch(await selectProducts("where p.id = $1", [id])),
 }));
 app.use("/api/orders", createOrderCheckoutRouter({ database: pool }));
+app.use("/api/orders", createOrderHistoryRouter({ database: pool }));
 app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 app.use("/api/shipping/delivery-estimate", createPostNordDeliveryEstimateRouter());
 app.use("/api/shipping/quote", createShippingQuoteRouter({ database: pool }));
 app.use("/api/search", createSearchRouter());
+app.use("/api/auth/google", createGoogleOAuthRouter({
+  adapter: createGoogleOAuthAdapter(),
+  database: pool,
+  startSession: startUserSession,
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+}));
+app.use("/api/auth/github", createGitHubOAuthRouter({
+  adapter: createGitHubOAuthAdapter(),
+  database: pool,
+  startSession: startGitHubAdminSession,
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+}));
+app.use("/api/admin/github/issues", createGitHubIssuesRouter({
+  adapter: createGitHubIssuesAdapter(),
+  requireAdmin,
+}));
 
 app.get("/api/health", async (_request, response) => {
   try {
@@ -92,7 +121,7 @@ app.post("/api/auth/register", async (request, response, next) => {
 
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
-      "insert into users (email, password_hash, role) values ($1, $2, 'customer') returning id, email, role",
+      "insert into users (email, password_hash, role) values ($1, $2, 'customer') returning id, email, name, role",
       [email, passwordHash],
     );
 
@@ -112,15 +141,25 @@ app.post("/api/auth/login", async (request, response, next) => {
       return response.status(400).json({ error: "Enter your email and password." });
     }
 
-    const result = await pool.query("select id, email, role, password_hash from users where email = $1", [email]);
+    const result = await pool.query("select id, email, name, role, password_hash from users where email = $1", [email]);
     const user = result.rows[0];
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
+    if (!user?.password_hash || !(await verifyPassword(password, user.password_hash))) {
       return response.status(401).json({ error: "Login failed. Check your email and password." });
     }
 
     if (user.password_hash.startsWith("bcrypt$")) {
       user.password_hash = await hashPassword(password);
       await pool.query("update users set password_hash=$1,updated_at=now() where id=$2", [user.password_hash, user.id]);
+    }
+
+    if (request.session.pendingGoogleLink) {
+      try {
+        await linkPendingGoogleIdentity(pool, user, request.session.pendingGoogleLink);
+      } catch (error) {
+        if (error instanceof GoogleAccountLinkError) return response.status(409).json({ error: error.message });
+        return next(error);
+      }
+      delete request.session.pendingGoogleLink;
     }
 
     await startUserSession(request, user);
@@ -140,8 +179,28 @@ app.post("/api/auth/logout", (request, response, next) => {
 
 app.get("/api/auth/me", async (request, response, next) => {
   try {
+    if (request.session.githubAdminId) {
+      const result = await pool.query(
+        "select github_id, login, name from github_admins where github_id = $1",
+        [request.session.githubAdminId],
+      );
+      const admin = result.rows[0] ?? null;
+      if (!admin) request.session.destroy(() => {});
+      const customer = admin && request.session.userId
+        ? await pool.query("select id from users where id = $1", [request.session.userId])
+        : null;
+      return response.json({
+        user: admin ? {
+          id: `github:${admin.github_id}`,
+          email: null,
+          name: admin.name ?? admin.login,
+          role: "admin",
+          cartUserId: customer?.rows[0]?.id ?? null,
+        } : null,
+      });
+    }
     if (!request.session.userId) return response.json({ user: null });
-    const result = await pool.query("select id, email, role from users where id = $1", [request.session.userId]);
+    const result = await pool.query("select id, email, name, role from users where id = $1", [request.session.userId]);
     const user = result.rows[0] ?? null;
     if (!user) request.session.destroy(() => {});
     return response.json({ user: user ? publicUser(user) : null });
@@ -396,8 +455,18 @@ function requireUser(request, response, next) {
 }
 
 async function requireAdmin(request, response, next) {
-  if (!request.session.userId) return response.status(401).json({ error: "Login required." });
+  if (!request.session.userId && !request.session.githubAdminId) {
+    return response.status(401).json({ error: "Login required." });
+  }
   try {
+    if (request.session.githubAdminId) {
+      const result = await pool.query(
+        "select 1 from github_admins where github_id = $1",
+        [request.session.githubAdminId],
+      );
+      if (result.rowCount === 0) return response.status(403).json({ error: "Admin access required." });
+      return next();
+    }
     const result = await pool.query("select role from users where id=$1", [request.session.userId]);
     if (result.rows[0]?.role !== "admin") return response.status(403).json({ error: "Admin access required." });
     return next();
@@ -412,8 +481,17 @@ async function startUserSession(request, user) {
   await new Promise((resolve, reject) => request.session.save((error) => error ? reject(error) : resolve()));
 }
 
+async function startGitHubAdminSession(request, admin) {
+  const customerUserId = request.session.userId;
+  await new Promise((resolve, reject) => request.session.regenerate((error) => error ? reject(error) : resolve()));
+  request.session.githubAdminId = admin.id;
+  request.session.githubAdminLogin = admin.login;
+  if (customerUserId) request.session.userId = customerUserId;
+  await new Promise((resolve, reject) => request.session.save((error) => error ? reject(error) : resolve()));
+}
+
 function publicUser(user) {
-  return { id: user.id, email: user.email, role: user.role };
+  return { id: user.id, email: user.email, name: user.name ?? null, role: user.role, cartUserId: user.id };
 }
 
 function normalizeEmail(email) {

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { LogIn, LogOut, ShieldCheck, Search, ShoppingCart } from "lucide-react";
+import { LogIn, LogOut, ShieldCheck, Search, ShoppingCart, UserRound } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { useCart } from "../../cart/CartContext";
 import { Link } from "../../components/Link";
@@ -9,7 +9,14 @@ function readProductSearch() {
   return new URLSearchParams(window.location.search).get("search") ?? "";
 }
 
-function getInitials(email: string | undefined) {
+function getInitials(name: string | null | undefined, email: string | null | undefined) {
+  const nameParts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (nameParts.length > 1) {
+    return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+  }
+  if (nameParts.length === 1) {
+    return nameParts[0].slice(0, 2).toUpperCase();
+  }
   if (!email) {
     return "G";
   }
@@ -95,22 +102,30 @@ export function CustomerHeader() {
         <div className="header-actions">
           <div className="profile-menu">
             <button type="button" className="profile-avatar" aria-label="Öppna profilmeny">
-              {getInitials(user?.email)}
+              {getInitials(user?.name, user?.email)}
             </button>
             <div className="profile-dropdown">
               <div className="profile-summary">
-                <span className="profile-avatar small">{getInitials(user?.email)}</span>
+                <span className="profile-avatar small">{getInitials(user?.name, user?.email)}</span>
                 <span>
                   <strong>{user ? "Inloggad" : "Gäst"}</strong>
-                  <span>{user?.email ?? "Logga in för adminåtkomst"}</span>
+                  <span>{user?.email ?? user?.name ?? "Logga in för adminåtkomst"}</span>
                 </span>
               </div>
 
               {user ? (
-                <button type="button" className="profile-menu-item" onClick={() => void signOut()}>
-                  <LogOut size={18} strokeWidth={2.4} aria-hidden="true" />
-                  Logga ut
-                </button>
+                <>
+                  {(user.role === "customer" || user.cartUserId) && (
+                    <Link href="/account/orders" className="profile-menu-item">
+                      <UserRound size={18} strokeWidth={2.4} aria-hidden="true" />
+                      Mina sidor
+                    </Link>
+                  )}
+                  <button type="button" className="profile-menu-item" onClick={() => void signOut()}>
+                    <LogOut size={18} strokeWidth={2.4} aria-hidden="true" />
+                    Logga ut
+                  </button>
+                </>
               ) : (
                 <Link href={getLoginPath()} className="profile-menu-item">
                   <LogIn size={18} strokeWidth={2.4} aria-hidden="true" />

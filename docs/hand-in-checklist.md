@@ -31,6 +31,15 @@ Denna checklista visar var kraven i uppgiften uppfylls i projektet.
 | Admin kan ändra orderstatus | `frontend/src/pages/admin/AdminOrderDetailsPage.tsx` och `frontend/src/services/orderService.ts` |
 | Statusvärden | `Beställd`, `Behandlas`, `Levererad`, `Återbetald` |
 
+## Uppgift 2: Google, GitHub och e-post
+
+| Krav | Var det finns | Status |
+| --- | --- | --- |
+| Labb 6: Google-inloggning, kundsession och Mina sidor | `backend/src/integrations/googleOAuthRoutes.js`, `backend/src/integrations/googleOAuthAdapter.js` och orderhistorikens routes | Implementerad; samtliga `Klart när`-krav återstår att verifiera i den deployade shoppen |
+| Labb 7: GitHub-admininloggning och skyddade adminroutes | `backend/src/integrations/githubOAuthRoutes.js` och `backend/src/server.js` | Manuellt verifierad lokalt; deployad verifiering återstår |
+| Labb 7: skapa och lista issues | `backend/src/integrations/githubIssuesRoutes.js`, `backend/src/integrations/githubIssuesAdapter.js` och `frontend/src/pages/admin/AdminGitHubIssuesPage.tsx` | Skapa, lista, rapportör och 401 utan session manuellt verifierade lokalt; deployad verifiering återstår |
+| Labb 8: skicka orderbekräftelse efter betald order | `backend/src/integrations/stripeWebhookRoutes.js` och `backend/src/integrations/resendEmailAdapter.js` | Implementerad; lokala tester passerar och ett syntetiskt provmejl accepterades av Resend; full verifiering i deployad shop återstår |
+
 ## Granskningsuppgifter
 
 Den publika deployment-länken och admininloggningen finns i `README.md`.

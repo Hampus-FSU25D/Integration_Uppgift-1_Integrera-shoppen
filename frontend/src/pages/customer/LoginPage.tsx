@@ -21,7 +21,14 @@ export function LoginPage() {
   const { signIn, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const googleLoginResult = new URLSearchParams(window.location.search).get("google_login");
+  const [message, setMessage] = useState(() => {
+    if (googleLoginResult === "cancelled") return "Google-inloggningen avbröts. Du kan försöka igen.";
+    if (googleLoginResult === "link_required") return "Kontot finns redan. Logga in med samma e-postadress och lösenord för att koppla Google till ditt konto.";
+    if (googleLoginResult === "conflict") return "Det finns redan ett konto med den e-postadressen. Logga in med det kontot i stället.";
+    if (googleLoginResult === "failed") return "Google-inloggningen kunde inte slutföras. Försök igen.";
+    return "";
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -38,8 +45,8 @@ export function LoginPage() {
     try {
       await signIn(email, password);
       navigateTo(getRedirectPath());
-    } catch {
-      setMessage("Inloggningen misslyckades. Kontrollera e-post och lösenord.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Inloggningen misslyckades. Kontrollera e-post och lösenord.");
     } finally {
       setIsSubmitting(false);
     }
@@ -83,8 +90,20 @@ export function LoginPage() {
         </button>
       </form>
 
-      {message && <p className="form-message">{message}</p>}
+      <div className="auth-divider"><span>eller</span></div>
+      <button
+        type="button"
+        className="button secondary-action google-login-button"
+        onClick={() => window.location.assign("/api/auth/google")}
+      >
+        Fortsätt med Google
+      </button>
 
+      {message && <p className="form-message" role="alert">{message}</p>}
+
+      <p>
+        <Link href="/admin/login">Administratör? Logga in med GitHub</Link>
+      </p>
       <p>
         <Link href="/register">Registrera kundkonto</Link>
       </p>

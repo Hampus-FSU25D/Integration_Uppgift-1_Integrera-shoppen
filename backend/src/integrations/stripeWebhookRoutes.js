@@ -1,7 +1,13 @@
 import express from "express";
+import { sendOrderConfirmation } from "./resendEmailAdapter.js";
 import { constructStripeWebhookEvent } from "./stripeWebhookAdapter.js";
 
-export function createStripeWebhookRouter({ database, constructEvent = constructStripeWebhookEvent }) {
+export function createStripeWebhookRouter({
+  database,
+  constructEvent = constructStripeWebhookEvent,
+  sendConfirmation = sendOrderConfirmation,
+  logger = console,
+}) {
   const router = express.Router();
 
   router.post("/", express.raw({ type: "application/json", limit: "100kb" }), async (request, response, next) => {
@@ -38,7 +44,7 @@ export function createStripeWebhookRouter({ database, constructEvent = construct
     try {
       await client.query("begin");
       const orderResult = await client.query(
-        "select id,total_price,status from orders where id=$1 for update",
+        "select id,total_price,status,customer_name,customer_email from orders where id=$1 for update",
         [orderId],
       );
       const order = orderResult.rows[0];
@@ -46,7 +52,7 @@ export function createStripeWebhookRouter({ database, constructEvent = construct
         await client.query("rollback");
         return response.json({ received: true });
       }
-      if (order.status !== "pending") {
+      if (order.status !== "pending" && order.status !== "confirmed") {
         await client.query("commit");
         return response.json({ received: true });
       }
@@ -56,19 +62,27 @@ export function createStripeWebhookRouter({ database, constructEvent = construct
       }
 
       const itemResult = await client.query(
-        "select product_id,quantity from order_items where order_id=$1",
+        "select product_id,product_name,quantity,price_at_purchase from order_items where order_id=$1",
         [orderId],
       );
-      for (const item of itemResult.rows) {
-        if (!item.product_id) throw new Error("Order item has no product.");
-        const stockResult = await client.query(
-          "update products set stock=stock-$1,updated_at=now() where id=$2 and stock >= $1",
-          [item.quantity, item.product_id],
-        );
-        if (!stockResult.rowCount) throw new Error("Insufficient stock for paid order.");
+      if (order.status === "pending") {
+        for (const item of itemResult.rows) {
+          if (!item.product_id) throw new Error("Order item has no product.");
+          const stockResult = await client.query(
+            "update products set stock=stock-$1,updated_at=now() where id=$2 and stock >= $1",
+            [item.quantity, item.product_id],
+          );
+          if (!stockResult.rowCount) throw new Error("Insufficient stock for paid order.");
+        }
+        await client.query("update orders set status='confirmed',updated_at=now() where id=$1", [orderId]);
       }
-      await client.query("update orders set status='confirmed',updated_at=now() where id=$1", [orderId]);
       await client.query("commit");
+
+      try {
+        await sendConfirmation(order, itemResult.rows);
+      } catch (error) {
+        logger.error("Order confirmation email failed", orderId, error instanceof Error ? error.message : "Unknown error");
+      }
       return response.json({ received: true });
     } catch (error) {
       await client.query("rollback");
