@@ -50,9 +50,25 @@ test("forwards sorting together with a category filter", async () => {
   assert.deepEqual(searchArgs, ["", 1, 12, "mat", "price_desc"]);
 });
 
-async function requestSearch(query, { search }) {
+test("uses current database stock instead of the Algolia stock snapshot", async () => {
+  const productId = "550e8400-e29b-41d4-a716-446655440000";
+  const response = await requestSearch("", {
+    async search() {
+      return { hits: [{ id: productId, stock: 12 }], totalHits: 1, totalPages: 1, page: 1 };
+    },
+    async loadCurrentStocks(productIds) {
+      assert.deepEqual(productIds, [productId]);
+      return [{ id: productId, stock: 0 }];
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).hits[0].stock, 0);
+});
+
+async function requestSearch(query, { search, loadCurrentStocks }) {
   const app = express();
-  app.use("/api/search", createSearchRouter({ search }));
+  app.use("/api/search", createSearchRouter({ search, loadCurrentStocks }));
   app.use((error, _request, response, _next) => response.status(500).json({ error: error.message }));
 
   const server = app.listen(0, "127.0.0.1");

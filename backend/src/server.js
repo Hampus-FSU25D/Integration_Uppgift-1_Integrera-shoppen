@@ -84,7 +84,15 @@ app.use("/api/orders", createOrderPaymentRouter({ database: pool }));
 app.use("/api/shipping/service-points", createPostNordServicePointRouter());
 app.use("/api/shipping/delivery-estimate", createPostNordDeliveryEstimateRouter());
 app.use("/api/shipping/quote", createShippingQuoteRouter({ database: pool }));
-app.use("/api/search", createSearchRouter());
+app.use("/api/search", createSearchRouter({
+  loadCurrentStocks: async (productIds) => {
+    const result = await pool.query(
+      "select id, stock from products where id = any($1::uuid[]) and is_active = true",
+      [productIds],
+    );
+    return result.rows;
+  },
+}));
 app.use("/api/auth/google", createGoogleOAuthRouter({
   adapter: createGoogleOAuthAdapter(),
   database: pool,
@@ -335,12 +343,24 @@ app.delete("/api/admin/products/:id", requireAdmin, async (request, response, ne
 });
 
 app.get("/api/cart", requireUser, async (request, response, next) => {
+  const requestedProductIds = request.query.productIds === undefined
+    ? []
+    : typeof request.query.productIds === "string"
+      ? request.query.productIds.split(",")
+      : null;
+  if (!requestedProductIds || requestedProductIds.length > 100 || requestedProductIds.some((id) => !isUuid(id))) {
+    return response.status(400).json({ error: "Cart product IDs are invalid." });
+  }
+
   try {
     const cartId = await getOrCreateCart(request.session.userId);
     const result = await pool.query(
-      `select p.id as product_id, p.name, p.price, p.image_url, p.stock, ci.quantity
-       from cart_items ci join products p on p.id=ci.product_id where ci.cart_id=$1 order by ci.created_at`,
-      [cartId],
+      `select p.id as product_id, p.name, p.price, p.image_url,
+       case when p.is_active then p.stock else 0 end as stock, coalesce(ci.quantity, 0) as quantity
+       from products p left join cart_items ci on ci.product_id=p.id and ci.cart_id=$1
+       where ci.cart_id=$1 or p.id=any($2::uuid[])
+       order by ci.created_at nulls last, p.name`,
+      [cartId, requestedProductIds],
     );
     return response.json(result.rows.map((row) => ({
       productId: row.product_id,
