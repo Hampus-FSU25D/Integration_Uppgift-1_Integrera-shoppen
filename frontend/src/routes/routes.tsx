@@ -1,5 +1,6 @@
 import { AdminDashboardPage } from "../pages/admin/AdminDashboardPage";
 import { AdminLoginPage } from "../pages/admin/AdminLoginPage";
+import { AdminGitHubIssuesPage } from "../pages/admin/AdminGitHubIssuesPage";
 import { AdminLayout } from "../pages/admin/AdminLayout";
 import { AdminOrderDetailsPage } from "../pages/admin/AdminOrderDetailsPage";
 import { AdminOrdersPage } from "../pages/admin/AdminOrdersPage";
@@ -87,6 +88,13 @@ export const routes: RouteDefinition[] = [
     label: "Adminlogin",
     match: exact("/admin/login"),
     component: AdminLoginPage,
+  },
+  {
+    path: "/admin/github/issues",
+    label: "Admin GitHub Issues",
+    match: exact("/admin/github/issues"),
+    component: AdminGitHubIssuesPage,
+    requiresAdmin: true,
   },
   {
     path: "/admin",

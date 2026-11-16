@@ -21,6 +21,8 @@ import { createGoogleOAuthAdapter } from "./integrations/googleOAuthAdapter.js";
 import { createGoogleOAuthRouter } from "./integrations/googleOAuthRoutes.js";
 import { createGitHubOAuthAdapter } from "./integrations/githubOAuthAdapter.js";
 import { createGitHubOAuthRouter } from "./integrations/githubOAuthRoutes.js";
+import { createGitHubIssuesAdapter } from "./integrations/githubIssuesAdapter.js";
+import { createGitHubIssuesRouter } from "./integrations/githubIssuesRoutes.js";
 import { GoogleAccountLinkError, linkPendingGoogleIdentity } from "./integrations/googleAccountLink.js";
 import { createOrderHistoryRouter } from "./integrations/orderHistoryRoutes.js";
 
@@ -94,6 +96,10 @@ app.use("/api/auth/github", createGitHubOAuthRouter({
   database: pool,
   startSession: startGitHubAdminSession,
   frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+}));
+app.use("/api/admin/github/issues", createGitHubIssuesRouter({
+  adapter: createGitHubIssuesAdapter(),
+  requireAdmin,
 }));
 
 app.get("/api/health", async (_request, response) => {
@@ -474,6 +480,7 @@ async function startUserSession(request, user) {
 async function startGitHubAdminSession(request, admin) {
   await new Promise((resolve, reject) => request.session.regenerate((error) => error ? reject(error) : resolve()));
   request.session.githubAdminId = admin.id;
+  request.session.githubAdminLogin = admin.login;
   await new Promise((resolve, reject) => request.session.save((error) => error ? reject(error) : resolve()));
 }
 

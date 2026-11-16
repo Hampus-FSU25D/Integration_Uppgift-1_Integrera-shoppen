@@ -11,6 +11,7 @@ const adminLinks = [
   { href: "/admin/products", label: "Produkter" },
   { href: "/admin/products/new", label: "Lägg till produkt" },
   { href: "/admin/orders", label: "Ordrar" },
+  { href: "/admin/github/issues", label: "GitHub Issues" },
 ];
 
 export function AdminLayout({ currentPath, children }: AdminLayoutProps) {
