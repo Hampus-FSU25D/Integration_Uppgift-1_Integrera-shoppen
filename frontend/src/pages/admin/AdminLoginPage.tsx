@@ -23,13 +23,12 @@ export function AdminLoginPage() {
   }, [result, user]);
 
   return (
-    <section className="placeholder auth-panel">
-      <span className="eyebrow">Everyday Market Admin</span>
-      <h1>Administratörs<wbr />inloggning</h1>
+    <section className="placeholder auth-panel admin-auth-panel">
+      <h1>Admininloggning</h1>
       <p>Logga in med ett GitHub-konto som har administratörsbehörighet.</p>
       <button
         type="button"
-        className="button secondary-action"
+        className="button admin-github-button"
         onClick={() => window.location.assign("/api/auth/github")}
       >
         Logga in med GitHub
