@@ -69,8 +69,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setIsSyncing(true);
 
       try {
-        const databaseItems = await getCartItems(cartUserId);
         const localItems = readStoredCart();
+        const databaseItems = await getCartItems(cartUserId, localItems.map((item) => item.productId));
         const mergedItems = mergeCartItems(databaseItems, localItems);
 
         if (!active) {
@@ -270,11 +270,7 @@ function mergeCartItems(databaseItems: CartItem[], localItems: CartItem[]) {
 
     itemsByProductId.set(item.productId, {
       ...existingItem,
-      name: item.name,
-      price: item.price,
-      imageUrl: item.imageUrl,
-      stock: item.stock,
-      quantity: Math.min(existingItem.quantity + item.quantity, item.stock),
+      quantity: Math.min(existingItem.quantity + item.quantity, existingItem.stock),
     });
   }
 
