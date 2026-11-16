@@ -1,4 +1,5 @@
 import { AdminDashboardPage } from "../pages/admin/AdminDashboardPage";
+import { AdminLoginPage } from "../pages/admin/AdminLoginPage";
 import { AdminLayout } from "../pages/admin/AdminLayout";
 import { AdminOrderDetailsPage } from "../pages/admin/AdminOrderDetailsPage";
 import { AdminOrdersPage } from "../pages/admin/AdminOrdersPage";
@@ -80,6 +81,12 @@ export const routes: RouteDefinition[] = [
     label: "Mina sidor",
     match: exact("/account/orders"),
     component: CustomerOrdersPage,
+  },
+  {
+    path: "/admin/login",
+    label: "Adminlogin",
+    match: exact("/admin/login"),
+    component: AdminLoginPage,
   },
   {
     path: "/admin",

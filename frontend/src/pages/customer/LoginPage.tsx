@@ -102,6 +102,9 @@ export function LoginPage() {
       {message && <p className="form-message" role="alert">{message}</p>}
 
       <p>
+        <Link href="/admin/login">Administratör? Logga in med GitHub</Link>
+      </p>
+      <p>
         <Link href="/register">Registrera kundkonto</Link>
       </p>
     </section>

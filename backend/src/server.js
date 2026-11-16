@@ -19,6 +19,8 @@ import { createPostNordDeliveryEstimateRouter } from "./integrations/postNordDel
 import { createShippingQuoteRouter } from "./integrations/shippingQuoteRoutes.js";
 import { createGoogleOAuthAdapter } from "./integrations/googleOAuthAdapter.js";
 import { createGoogleOAuthRouter } from "./integrations/googleOAuthRoutes.js";
+import { createGitHubOAuthAdapter } from "./integrations/githubOAuthAdapter.js";
+import { createGitHubOAuthRouter } from "./integrations/githubOAuthRoutes.js";
 import { GoogleAccountLinkError, linkPendingGoogleIdentity } from "./integrations/googleAccountLink.js";
 import { createOrderHistoryRouter } from "./integrations/orderHistoryRoutes.js";
 
@@ -85,6 +87,12 @@ app.use("/api/auth/google", createGoogleOAuthRouter({
   adapter: createGoogleOAuthAdapter(),
   database: pool,
   startSession: startUserSession,
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+}));
+app.use("/api/auth/github", createGitHubOAuthRouter({
+  adapter: createGitHubOAuthAdapter(),
+  database: pool,
+  startSession: startGitHubAdminSession,
   frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
 }));
 
@@ -165,6 +173,22 @@ app.post("/api/auth/logout", (request, response, next) => {
 
 app.get("/api/auth/me", async (request, response, next) => {
   try {
+    if (request.session.githubAdminId) {
+      const result = await pool.query(
+        "select github_id, login, name from github_admins where github_id = $1",
+        [request.session.githubAdminId],
+      );
+      const admin = result.rows[0] ?? null;
+      if (!admin) request.session.destroy(() => {});
+      return response.json({
+        user: admin ? {
+          id: `github:${admin.github_id}`,
+          email: null,
+          name: admin.name ?? admin.login,
+          role: "admin",
+        } : null,
+      });
+    }
     if (!request.session.userId) return response.json({ user: null });
     const result = await pool.query("select id, email, name, role from users where id = $1", [request.session.userId]);
     const user = result.rows[0] ?? null;
@@ -421,8 +445,18 @@ function requireUser(request, response, next) {
 }
 
 async function requireAdmin(request, response, next) {
-  if (!request.session.userId) return response.status(401).json({ error: "Login required." });
+  if (!request.session.userId && !request.session.githubAdminId) {
+    return response.status(401).json({ error: "Login required." });
+  }
   try {
+    if (request.session.githubAdminId) {
+      const result = await pool.query(
+        "select 1 from github_admins where github_id = $1",
+        [request.session.githubAdminId],
+      );
+      if (result.rowCount === 0) return response.status(403).json({ error: "Admin access required." });
+      return next();
+    }
     const result = await pool.query("select role from users where id=$1", [request.session.userId]);
     if (result.rows[0]?.role !== "admin") return response.status(403).json({ error: "Admin access required." });
     return next();
@@ -434,6 +468,12 @@ async function requireAdmin(request, response, next) {
 async function startUserSession(request, user) {
   await new Promise((resolve, reject) => request.session.regenerate((error) => error ? reject(error) : resolve()));
   request.session.userId = user.id;
+  await new Promise((resolve, reject) => request.session.save((error) => error ? reject(error) : resolve()));
+}
+
+async function startGitHubAdminSession(request, admin) {
+  await new Promise((resolve, reject) => request.session.regenerate((error) => error ? reject(error) : resolve()));
+  request.session.githubAdminId = admin.id;
   await new Promise((resolve, reject) => request.session.save((error) => error ? reject(error) : resolve()));
 }
 

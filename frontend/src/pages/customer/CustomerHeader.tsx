@@ -9,7 +9,7 @@ function readProductSearch() {
   return new URLSearchParams(window.location.search).get("search") ?? "";
 }
 
-function getInitials(name: string | null | undefined, email: string | undefined) {
+function getInitials(name: string | null | undefined, email: string | null | undefined) {
   const nameParts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
   if (nameParts.length > 1) {
     return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
@@ -109,16 +109,18 @@ export function CustomerHeader() {
                 <span className="profile-avatar small">{getInitials(user?.name, user?.email)}</span>
                 <span>
                   <strong>{user ? "Inloggad" : "Gäst"}</strong>
-                  <span>{user?.email ?? "Logga in för adminåtkomst"}</span>
+                  <span>{user?.email ?? user?.name ?? "Logga in för adminåtkomst"}</span>
                 </span>
               </div>
 
               {user ? (
                 <>
-                  <Link href="/account/orders" className="profile-menu-item">
-                    <UserRound size={18} strokeWidth={2.4} aria-hidden="true" />
-                    Mina sidor
-                  </Link>
+                  {user.role === "customer" && (
+                    <Link href="/account/orders" className="profile-menu-item">
+                      <UserRound size={18} strokeWidth={2.4} aria-hidden="true" />
+                      Mina sidor
+                    </Link>
+                  )}
                   <button type="button" className="profile-menu-item" onClick={() => void signOut()}>
                     <LogOut size={18} strokeWidth={2.4} aria-hidden="true" />
                     Logga ut

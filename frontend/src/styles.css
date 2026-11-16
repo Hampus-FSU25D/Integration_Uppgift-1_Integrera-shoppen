@@ -1464,6 +1464,10 @@ button:disabled,
   margin: 40px auto;
 }
 
+.auth-panel h1 {
+  font-size: clamp(1.75rem, 4.2vw, 2.5rem);
+}
+
 .customer-orders-page {
   display: grid;
   gap: 22px;
