@@ -9,7 +9,14 @@ function readProductSearch() {
   return new URLSearchParams(window.location.search).get("search") ?? "";
 }
 
-function getInitials(email: string | undefined) {
+function getInitials(name: string | null | undefined, email: string | undefined) {
+  const nameParts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (nameParts.length > 1) {
+    return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+  }
+  if (nameParts.length === 1) {
+    return nameParts[0].slice(0, 2).toUpperCase();
+  }
   if (!email) {
     return "G";
   }
@@ -95,11 +102,11 @@ export function CustomerHeader() {
         <div className="header-actions">
           <div className="profile-menu">
             <button type="button" className="profile-avatar" aria-label="Öppna profilmeny">
-              {getInitials(user?.email)}
+              {getInitials(user?.name, user?.email)}
             </button>
             <div className="profile-dropdown">
               <div className="profile-summary">
-                <span className="profile-avatar small">{getInitials(user?.email)}</span>
+                <span className="profile-avatar small">{getInitials(user?.name, user?.email)}</span>
                 <span>
                   <strong>{user ? "Inloggad" : "Gäst"}</strong>
                   <span>{user?.email ?? "Logga in för adminåtkomst"}</span>

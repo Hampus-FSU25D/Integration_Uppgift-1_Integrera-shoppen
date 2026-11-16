@@ -102,7 +102,7 @@ app.post("/api/auth/register", async (request, response, next) => {
 
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
-      "insert into users (email, password_hash, role) values ($1, $2, 'customer') returning id, email, role",
+      "insert into users (email, password_hash, role) values ($1, $2, 'customer') returning id, email, name, role",
       [email, passwordHash],
     );
 
@@ -122,7 +122,7 @@ app.post("/api/auth/login", async (request, response, next) => {
       return response.status(400).json({ error: "Enter your email and password." });
     }
 
-    const result = await pool.query("select id, email, role, password_hash from users where email = $1", [email]);
+    const result = await pool.query("select id, email, name, role, password_hash from users where email = $1", [email]);
     const user = result.rows[0];
     if (!user?.password_hash || !(await verifyPassword(password, user.password_hash))) {
       return response.status(401).json({ error: "Login failed. Check your email and password." });
@@ -151,7 +151,7 @@ app.post("/api/auth/logout", (request, response, next) => {
 app.get("/api/auth/me", async (request, response, next) => {
   try {
     if (!request.session.userId) return response.json({ user: null });
-    const result = await pool.query("select id, email, role from users where id = $1", [request.session.userId]);
+    const result = await pool.query("select id, email, name, role from users where id = $1", [request.session.userId]);
     const user = result.rows[0] ?? null;
     if (!user) request.session.destroy(() => {});
     return response.json({ user: user ? publicUser(user) : null });
@@ -423,7 +423,7 @@ async function startUserSession(request, user) {
 }
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, role: user.role };
+  return { id: user.id, email: user.email, name: user.name ?? null, role: user.role };
 }
 
 function normalizeEmail(email) {

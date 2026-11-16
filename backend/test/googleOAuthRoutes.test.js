@@ -5,15 +5,19 @@ import { createGoogleOAuthRouter } from "../src/integrations/googleOAuthRoutes.j
 
 const existing = { id: "user-1", email: "customer@example.com", role: "customer", google_sub: null };
 
-function createDependencies({ identity = { sub: "google-123", email: "customer@example.com", name: "Customer" }, existingUser = null } = {}) {
+function createDependencies({
+  identity = { sub: "google-123", email: "customer@example.com", name: "Customer" },
+  existingUser = null,
+  googleUser = null,
+} = {}) {
   const calls = [];
+  const logs = [];
   const session = {};
   const database = {
     async query(sql, values) {
       calls.push({ sql, values });
-      if (sql.includes("where google_sub")) return { rows: [] };
+      if (sql.includes("where google_sub")) return { rows: googleUser ? [{ ...googleUser }] : [] };
       if (sql.includes("where email")) return { rows: existingUser ? [{ ...existingUser }] : [] };
-      if (sql.includes("update users set google_sub")) return { rows: [{ id: existingUser.id, email: existingUser.email, role: existingUser.role }] };
       if (sql.includes("insert into users")) return { rows: [{ id: "new-user", email: values[0], role: "customer" }] };
       throw new Error(`Unexpected query: ${sql}`);
     },
@@ -28,8 +32,12 @@ function createDependencies({ identity = { sub: "google-123", email: "customer@e
   const startSession = async (_request, user) => {
     session.userId = user.id;
   };
+  const logger = {
+    warn(...args) { logs.push(args); },
+    error(...args) { logs.push(args); },
+  };
 
-  return { calls, database, session, adapter, startSession };
+  return { calls, logs, database, session, adapter, startSession, logger };
 }
 
 async function request(path, dependencies, method = "GET", cookie) {
@@ -43,6 +51,7 @@ async function request(path, dependencies, method = "GET", cookie) {
     database: dependencies.database,
     startSession: dependencies.startSession,
     frontendUrl: "http://localhost:5173",
+    logger: dependencies.logger,
   }));
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -79,15 +88,26 @@ test("rejects a missing or mismatched state without exchanging the code", async 
   assert.equal(dependencies.session.googleAuthState, undefined);
 });
 
-test("links the verified Google identity to an existing matching email and starts a session", async () => {
+test("shows an account conflict for an existing email instead of linking accounts", async () => {
   const dependencies = createDependencies({ existingUser: existing });
+  dependencies.session.googleAuthState = "expected-state";
+  const response = await request("/api/auth/google/callback?code=valid-code&state=expected-state", dependencies);
+
+  assert.equal(response.status, 302);
+  assert.match(response.headers.get("location"), /google_login=conflict/);
+  assert.equal(dependencies.session.userId, undefined);
+  assert.ok(!dependencies.calls.some(({ sql }) => sql.includes("update users set google_sub")));
+});
+
+test("reuses an account with the same Google subject", async () => {
+  const dependencies = createDependencies({ googleUser: { id: "user-1", email: "customer@example.com", role: "customer" } });
   dependencies.session.googleAuthState = "expected-state";
   const response = await request("/api/auth/google/callback?code=valid-code&state=expected-state", dependencies);
 
   assert.equal(response.status, 302);
   assert.match(response.headers.get("location"), /google_login=success/);
   assert.equal(dependencies.session.userId, "user-1");
-  assert.ok(dependencies.calls.some(({ sql, values }) => sql.includes("update users set google_sub") && values[0] === "google-123"));
+  assert.equal(dependencies.calls.length, 1);
 });
 
 test("creates a customer identity when no account has the verified email", async () => {
@@ -108,4 +128,22 @@ test("returns an understandable cancellation result", async () => {
   assert.equal(response.status, 302);
   assert.match(response.headers.get("location"), /google_login=cancelled/);
   assert.equal(dependencies.calls.length, 0);
+});
+
+test("logs only a safe failure stage, not the provider error message", async () => {
+  const dependencies = createDependencies();
+  dependencies.adapter.exchangeCode = async () => {
+    throw Object.assign(new Error("secret authorization code"), { code: "ECONNRESET" });
+  };
+  dependencies.session.googleAuthState = "expected-state";
+  const response = await request("/api/auth/google/callback?code=valid-code&state=expected-state", dependencies);
+
+  assert.equal(response.status, 302);
+  assert.match(response.headers.get("location"), /google_login=failed/);
+  assert.deepEqual(dependencies.logs, [["[google-oauth] sign-in step failed", {
+    stage: "token_exchange",
+    name: "Error",
+    code: "ECONNRESET",
+  }]]);
+  assert.equal(JSON.stringify(dependencies.logs).includes("secret authorization code"), false);
 });

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api";
 
 export type UserRole = "customer" | "admin";
-export type ShopUser = { id: string; email: string; role: UserRole };
+export type ShopUser = { id: string; email: string; name: string | null; role: UserRole };
 
 type AuthStatus = "loading" | "ready";
 type AuthContextValue = {

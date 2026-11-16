@@ -24,6 +24,7 @@ export function LoginPage() {
   const googleLoginResult = new URLSearchParams(window.location.search).get("google_login");
   const [message, setMessage] = useState(() => {
     if (googleLoginResult === "cancelled") return "Google-inloggningen avbröts. Du kan försöka igen.";
+    if (googleLoginResult === "conflict") return "Det finns redan ett konto med den e-postadressen. Logga in med det kontot i stället.";
     if (googleLoginResult === "failed") return "Google-inloggningen kunde inte slutföras. Försök igen.";
     return "";
   });
