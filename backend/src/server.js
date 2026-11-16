@@ -19,6 +19,7 @@ import { createPostNordDeliveryEstimateRouter } from "./integrations/postNordDel
 import { createShippingQuoteRouter } from "./integrations/shippingQuoteRoutes.js";
 import { createGoogleOAuthAdapter } from "./integrations/googleOAuthAdapter.js";
 import { createGoogleOAuthRouter } from "./integrations/googleOAuthRoutes.js";
+import { GoogleAccountLinkError, linkPendingGoogleIdentity } from "./integrations/googleAccountLink.js";
 import { createOrderHistoryRouter } from "./integrations/orderHistoryRoutes.js";
 
 const scrypt = promisify(scryptCallback);
@@ -64,6 +65,10 @@ app.use(
     },
   }),
 );
+app.use("/api/auth", (_request, response, next) => {
+  response.set("Cache-Control", "no-store");
+  next();
+});
 app.use("/api/admin/products", createAdminProductImageRouter({
   requireAdmin,
   database: pool,
@@ -131,6 +136,16 @@ app.post("/api/auth/login", async (request, response, next) => {
     if (user.password_hash.startsWith("bcrypt$")) {
       user.password_hash = await hashPassword(password);
       await pool.query("update users set password_hash=$1,updated_at=now() where id=$2", [user.password_hash, user.id]);
+    }
+
+    if (request.session.pendingGoogleLink) {
+      try {
+        await linkPendingGoogleIdentity(pool, user, request.session.pendingGoogleLink);
+      } catch (error) {
+        if (error instanceof GoogleAccountLinkError) return response.status(409).json({ error: error.message });
+        return next(error);
+      }
+      delete request.session.pendingGoogleLink;
     }
 
     await startUserSession(request, user);

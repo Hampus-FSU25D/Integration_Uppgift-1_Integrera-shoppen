@@ -3,7 +3,7 @@ import test from "node:test";
 import express from "express";
 import { createGoogleOAuthRouter } from "../src/integrations/googleOAuthRoutes.js";
 
-const existing = { id: "user-1", email: "customer@example.com", role: "customer", google_sub: null };
+const existing = { id: "user-1", email: "customer@example.com", role: "customer", google_sub: null, password_hash: "stored-hash" };
 
 function createDependencies({
   identity = { sub: "google-123", email: "customer@example.com", name: "Customer" },
@@ -13,6 +13,7 @@ function createDependencies({
   const calls = [];
   const logs = [];
   const session = {};
+  let sessionStarts = 0;
   const database = {
     async query(sql, values) {
       calls.push({ sql, values });
@@ -30,6 +31,7 @@ function createDependencies({
     },
   };
   const startSession = async (_request, user) => {
+    sessionStarts += 1;
     session.userId = user.id;
   };
   const logger = {
@@ -37,7 +39,7 @@ function createDependencies({
     error(...args) { logs.push(args); },
   };
 
-  return { calls, logs, database, session, adapter, startSession, logger };
+  return { calls, logs, database, session, adapter, startSession, logger, get sessionStarts() { return sessionStarts; } };
 }
 
 async function request(path, dependencies, method = "GET", cookie) {
@@ -88,14 +90,20 @@ test("rejects a missing or mismatched state without exchanging the code", async 
   assert.equal(dependencies.session.googleAuthState, undefined);
 });
 
-test("shows an account conflict for an existing email instead of linking accounts", async () => {
+test("asks the customer to authenticate their existing password account before linking Google", async () => {
   const dependencies = createDependencies({ existingUser: existing });
   dependencies.session.googleAuthState = "expected-state";
   const response = await request("/api/auth/google/callback?code=valid-code&state=expected-state", dependencies);
 
   assert.equal(response.status, 302);
-  assert.match(response.headers.get("location"), /google_login=conflict/);
+  assert.match(response.headers.get("location"), /google_login=link_required/);
   assert.equal(dependencies.session.userId, undefined);
+  assert.deepEqual(Object.keys(dependencies.session.pendingGoogleLink).sort(), ["email", "name", "requestedAt", "sub"]);
+  assert.equal(dependencies.session.pendingGoogleLink.sub, "google-123");
+  assert.equal(dependencies.session.pendingGoogleLink.email, "customer@example.com");
+  assert.equal(dependencies.session.pendingGoogleLink.name, "Customer");
+  assert.equal(typeof dependencies.session.pendingGoogleLink.requestedAt, "number");
+  assert.equal(dependencies.sessionStarts, 0);
   assert.ok(!dependencies.calls.some(({ sql }) => sql.includes("update users set google_sub")));
 });
 
@@ -123,11 +131,16 @@ test("creates a customer identity when no account has the verified email", async
 test("returns an understandable cancellation result", async () => {
   const dependencies = createDependencies();
   dependencies.session.googleAuthState = "expected-state";
+  dependencies.session.pendingGoogleLink = { sub: "old-google-id" };
   const response = await request("/api/auth/google/callback?error=access_denied&state=expected-state", dependencies);
 
   assert.equal(response.status, 302);
   assert.match(response.headers.get("location"), /google_login=cancelled/);
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(dependencies.calls.length, 0);
+  assert.equal(dependencies.session.userId, undefined);
+  assert.equal(dependencies.sessionStarts, 0);
+  assert.equal(dependencies.session.pendingGoogleLink, undefined);
 });
 
 test("logs only a safe failure stage, not the provider error message", async () => {

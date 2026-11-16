@@ -5,10 +5,16 @@ export function createGoogleOAuthRouter({ adapter, database, startSession, front
   const router = express.Router();
   const returnUrl = new URL("/", frontendUrl.split(",")[0].trim());
 
+  router.use((_request, response, next) => {
+    response.set("Cache-Control", "no-store");
+    next();
+  });
+
   router.get("/", (request, response) => {
     const state = randomBytes(32).toString("base64url");
     try {
       const authorizationUrl = adapter.createAuthorizationUrl(state);
+      delete request.session.pendingGoogleLink;
       request.session.googleAuthState = state;
       return response.redirect(authorizationUrl);
     } catch (error) {
@@ -26,6 +32,7 @@ export function createGoogleOAuthRouter({ adapter, database, startSession, front
       return response.redirect(loginResult(returnUrl, "failed"));
     }
     if (request.query.error === "access_denied") {
+      delete request.session.pendingGoogleLink;
       return response.redirect(loginResult(returnUrl, "cancelled"));
     }
     if (typeof request.query.code !== "string" || request.query.error) {
@@ -36,7 +43,17 @@ export function createGoogleOAuthRouter({ adapter, database, startSession, front
     try {
       const identity = await adapter.exchangeCode(request.query.code);
       stage = "customer_account";
-      const user = await findOrCreateCustomer(database, identity);
+      const result = await findOrCreateCustomer(database, identity);
+      if (result.pendingGoogleLink) {
+        request.session.pendingGoogleLink = {
+          sub: identity.sub,
+          email: identity.email,
+          name: identity.name,
+          requestedAt: Date.now(),
+        };
+        return response.redirect(loginResult(returnUrl, "link_required"));
+      }
+      const user = result.user;
       if (!user) return response.redirect(loginResult(returnUrl, "conflict"));
       stage = "session_creation";
       await startSession(request, user);
@@ -64,22 +81,24 @@ async function findOrCreateCustomer(database, identity) {
     "select id, email, role from users where google_sub = $1",
     [identity.sub],
   );
-  if (byGoogleId.rows[0]) return byGoogleId.rows[0];
+  if (byGoogleId.rows[0]) return { user: byGoogleId.rows[0] };
 
   const byEmail = await database.query(
-    "select id, email, role, google_sub from users where email = $1",
+    "select id, email, role, google_sub, password_hash from users where email = $1",
     [identity.email],
   );
   const existing = byEmail.rows[0];
   if (existing) {
-    return null;
+    return {
+      pendingGoogleLink: existing.role === "customer" && Boolean(existing.password_hash) && !existing.google_sub,
+    };
   }
 
   const created = await database.query(
     "insert into users (email, name, google_sub, role) values ($1, $2, $3, 'customer') returning id, email, role",
     [identity.email, identity.name, identity.sub],
   );
-  return created.rows[0] ?? null;
+  return { user: created.rows[0] ?? null };
 }
 
 function matchesState(expected, actual) {
