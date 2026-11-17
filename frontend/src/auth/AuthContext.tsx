@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     async signOut() {
       await apiRequest<void>("/auth/logout", { method: "POST" });
-      setUser(null);
+      window.location.replace("/");
     },
   }), [status, user]);
 
